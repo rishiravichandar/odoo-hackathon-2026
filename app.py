@@ -1,8 +1,9 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 import os
 import sqlite3
 import hashlib
 import datetime
+from functools import wraps
 from database import get_db_connection, init_db, hash_password
 
 app = Flask(__name__)
@@ -19,13 +20,47 @@ app.config.update(
 # Initialize the SQLite database automatically on startup
 init_db()
 
+def calculate_vehicle_roi(conn, vehicle_id, acquisition_cost):
+    if not acquisition_cost or acquisition_cost <= 0:
+        return 0.0
+    
+    # 1. Revenue: sum of revenue from completed trips
+    rev_row = conn.execute("SELECT SUM(revenue) FROM trips WHERE vehicle_id = ? AND status = 'Completed'", (vehicle_id,)).fetchone()
+    revenue = rev_row[0] if rev_row and rev_row[0] is not None else 0.0
+    
+    # 2. Fuel Cost: sum of fuel log costs
+    fuel_row = conn.execute("SELECT SUM(cost) FROM fuel_logs WHERE vehicle_id = ?", (vehicle_id,)).fetchone()
+    fuel_cost = fuel_row[0] if fuel_row and fuel_row[0] is not None else 0.0
+    
+    # 3. Maintenance Cost: sum of actual maintenance costs
+    maint_row = conn.execute("SELECT SUM(actual_cost) FROM maintenance_logs WHERE vehicle_id = ? AND status = 'Completed'", (vehicle_id,)).fetchone()
+    maint_cost = maint_row[0] if maint_row and maint_row[0] is not None else 0.0
+    
+    roi = (revenue - (fuel_cost + maint_cost)) / acquisition_cost
+    return roi
+
 # Middleware to restrict access to authenticated users only
 @app.before_request
 def require_login():
     # Allowed endpoints without login
-    allowed_routes = ['login', 'quick_login', 'static']
+    allowed_routes = ['login', 'static']
     if request.endpoint not in allowed_routes and 'user_id' not in session:
+        if request.path.startswith('/api/'):
+            return jsonify({'error': 'Unauthorized access.'}), 401
         return redirect(url_for('login'))
+
+def roles_required(*roles):
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if 'user_role' not in session:
+                return redirect(url_for('login'))
+            if session.get('user_role') not in roles:
+                flash("Access Denied: You do not have the required permissions to access this resource.", "error")
+                return redirect(url_for('dashboard'))
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -61,37 +96,55 @@ def login():
 
     return render_template('login.html')
 
-@app.route('/quick-login')
-def quick_login():
-    role_param = request.args.get('role', 'manager')
-    role_map = {
-        'manager': 'Fleet Manager',
-        'driver': 'Driver',
-        'safety': 'Safety Officer',
-        'finance': 'Financial Analyst'
-    }
-    target_role = role_map.get(role_param, 'Fleet Manager')
-
-    conn = get_db_connection()
-    user = conn.execute('SELECT * FROM users WHERE role = ? LIMIT 1', (target_role,)).fetchone()
-    conn.close()
-
-    if user:
-        session['user_id'] = user['id']
-        session['user_name'] = user['name']
-        session['user_email'] = user['email']
-        session['user_role'] = user['role']
-        flash(f'Logged in as {user["name"]} ({user["role"]})', 'success')
-        return redirect(url_for('dashboard'))
-    else:
-        flash('Role user not found.', 'error')
-        return redirect(url_for('login'))
-
 @app.route('/logout')
 def logout():
     session.clear()
     flash('You have been logged out.', 'info')
     return redirect(url_for('login'))
+
+@app.route('/settings', methods=['GET', 'POST'])
+def settings():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    
+    conn = get_db_connection()
+    user_id = session['user_id']
+    
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        email = request.form.get('email', '').strip()
+        new_password = request.form.get('new_password', '').strip()
+        confirm_password = request.form.get('confirm_password', '').strip()
+        
+        if not name or not email:
+            flash("Name and email are required.", "error")
+        else:
+            existing = conn.execute('SELECT id FROM users WHERE email = ? AND id != ?', (email, user_id)).fetchone()
+            if existing:
+                flash("Email is already in use by another user.", "error")
+            else:
+                if new_password:
+                    if len(new_password) < 6:
+                        flash("Password must be at least 6 characters long.", "error")
+                    elif new_password != confirm_password:
+                        flash("Passwords do not match.", "error")
+                    else:
+                        hashed = hash_password(new_password)
+                        conn.execute('UPDATE users SET name = ?, email = ?, password = ? WHERE id = ?', (name, email, hashed, user_id))
+                        conn.commit()
+                        session['user_name'] = name
+                        session['user_email'] = email
+                        flash("Profile and password updated successfully!", "success")
+                else:
+                    conn.execute('UPDATE users SET name = ?, email = ? WHERE id = ?', (name, email, user_id))
+                    conn.commit()
+                    session['user_name'] = name
+                    session['user_email'] = email
+                    flash("Profile updated successfully!", "success")
+                    
+    user = conn.execute('SELECT * FROM users WHERE id = ?', (user_id,)).fetchone()
+    conn.close()
+    return render_template('settings.html', active_page='settings', user=user)
 
 def date_diff_days(d1_str, d2_str):
     try:
@@ -306,10 +359,12 @@ def dashboard():
     total_drivers = conn.execute('SELECT COUNT(*) FROM drivers').fetchone()[0] or 0
     drivers_on_trip = conn.execute('SELECT COUNT(*) FROM drivers WHERE status = "On Trip"').fetchone()[0] or 0
     drivers_available = conn.execute('SELECT COUNT(*) FROM drivers WHERE status = "Available"').fetchone()[0] or 0
-    drivers_on_leave = conn.execute('SELECT COUNT(*) FROM drivers WHERE status = "On Leave"').fetchone()[0] or 0
-    drivers_inactive = conn.execute('SELECT COUNT(*) FROM drivers WHERE status = "Inactive"').fetchone()[0] or 0
+    drivers_off_duty = conn.execute('SELECT COUNT(*) FROM drivers WHERE status = "Off Duty"').fetchone()[0] or 0
+    drivers_suspended = conn.execute('SELECT COUNT(*) FROM drivers WHERE status = "Suspended"').fetchone()[0] or 0
+    drivers_on_duty = conn.execute('SELECT COUNT(*) FROM drivers WHERE status IN ("Available", "On Trip")').fetchone()[0] or 0
 
-    active_trips = conn.execute('SELECT COUNT(*) FROM trips WHERE status IN ("In Progress", "Dispatched")').fetchone()[0] or 0
+    pending_trips = conn.execute('SELECT COUNT(*) FROM trips WHERE status = "Draft"').fetchone()[0] or 0
+    active_trips = conn.execute('SELECT COUNT(*) FROM trips WHERE status = "Dispatched"').fetchone()[0] or 0
     completed_trips = conn.execute('SELECT COUNT(*) FROM trips WHERE status = "Completed"').fetchone()[0] or 0
     cancelled_trips = conn.execute('SELECT COUNT(*) FROM trips WHERE status = "Cancelled"').fetchone()[0] or 0
 
@@ -349,8 +404,10 @@ def dashboard():
         'total_drivers': total_drivers,
         'drivers_on_trip': drivers_on_trip,
         'drivers_available': drivers_available,
-        'drivers_on_leave': drivers_on_leave,
-        'drivers_inactive': drivers_inactive,
+        'drivers_off_duty': drivers_off_duty,
+        'drivers_suspended': drivers_suspended,
+        'drivers_on_duty': drivers_on_duty,
+        'pending_trips': pending_trips,
         'active_trips': active_trips,
         'completed_trips': completed_trips,
         'cancelled_trips': cancelled_trips,
@@ -387,8 +444,8 @@ def dashboard():
     driver_status_distribution = {
         'Available': drivers_available,
         'On Trip': drivers_on_trip,
-        'On Leave': drivers_on_leave,
-        'Inactive': drivers_inactive
+        'Off Duty': drivers_off_duty,
+        'Suspended': drivers_suspended
     }
 
     # Trip Status Distribution
@@ -608,12 +665,42 @@ def dashboard():
         'operating_cost_per_km': operating_cost_per_km
     }
 
+    # Calculate fleet ROI and map vehicles list to dictionary
+    vehicles_data = []
+    for v in vehicles:
+        v_dict = dict(v)
+        v_dict['roi'] = calculate_vehicle_roi(conn, v['id'], v['acquisition_cost'])
+        v_dict['roi_percent'] = f"{v_dict['roi'] * 100:.2f}%"
+        vehicles_data.append(v_dict)
+
+    fleet_rois = [v['roi'] for v in vehicles_data if v['acquisition_cost'] > 0]
+    avg_fleet_roi = sum(fleet_rois) / len(fleet_rois) if fleet_rois else 0.0
+    
+    top_roi_vehicle = None
+    if vehicles_data:
+        top_roi_vehicle = max(vehicles_data, key=lambda x: x['roi'])
+        
+    roi_metrics = {
+        'avg_roi': f"{avg_fleet_roi * 100:.2f}%",
+        'top_vehicle': f"{top_roi_vehicle['registration_number']} ({top_roi_vehicle['roi'] * 100:.2f}%)" if top_roi_vehicle else "None"
+    }
+
+    driver_profile = None
+    driver_vehicle = None
+    driver_trips = []
+    if session.get('user_role') == 'Driver':
+        driver_profile = conn.execute('SELECT * FROM drivers WHERE email = ?', (session.get('user_email'),)).fetchone()
+        if driver_profile:
+            driver_trips = conn.execute('SELECT * FROM trips WHERE driver_id = ? ORDER BY created_at DESC', (driver_profile['id'],)).fetchall()
+            if driver_profile['assigned_vehicle_id']:
+                driver_vehicle = conn.execute('SELECT * FROM vehicles WHERE id = ?', (driver_profile['assigned_vehicle_id'],)).fetchone()
+
     conn.close()
 
     return render_template(
         'dashboard.html',
         active_page='dashboard',
-        vehicles=vehicles,
+        vehicles=vehicles_data,
         trips=trips,
         vehicle_types=vehicle_types,
         vehicle_statuses=vehicle_statuses,
@@ -633,13 +720,18 @@ def dashboard():
         downtime_report=downtime_report,
         driver_analytics=driver_analytics,
         trip_analytics=trip_analytics,
-        financial_analytics=financial_analytics
+        financial_analytics=financial_analytics,
+        roi_metrics=roi_metrics,
+        driver_profile=driver_profile,
+        driver_vehicle=driver_vehicle,
+        driver_trips=driver_trips
     )
 
 # -----------------------------------------------------------------------------
 # VEHICLE MANAGEMENT ROUTES
 # -----------------------------------------------------------------------------
 @app.route('/vehicles')
+@roles_required('Fleet Manager', 'Driver', 'Safety Officer')
 def vehicles_list():
     q = request.args.get('q', '').strip()
     status = request.args.get('status', '')
@@ -649,6 +741,12 @@ def vehicles_list():
     # 1. Base query with optional search and filter
     query = 'SELECT * FROM vehicles WHERE 1=1'
     params = []
+
+    if session.get('user_role') == 'Driver':
+        driver_row = conn.execute('SELECT assigned_vehicle_id FROM drivers WHERE email = ?', (session['user_email'],)).fetchone()
+        assigned_vehicle_id = driver_row['assigned_vehicle_id'] if (driver_row and driver_row['assigned_vehicle_id']) else -1
+        query += ' AND id = ?'
+        params.append(assigned_vehicle_id)
 
     if status:
         if status == 'ALL_INCLUDING_RETIRED':
@@ -665,8 +763,23 @@ def vehicles_list():
         params.append(f'%{q}%')
         params.append(f'%{q}%')
 
-    query += ' ORDER BY registration_number ASC'
-    vehicles = conn.execute(query, params).fetchall()
+    sort_by = request.args.get('sort_by', 'registration_number')
+
+    vehicles_raw = conn.execute(query, params).fetchall()
+
+    vehicles_data = []
+    for v in vehicles_raw:
+        v_dict = dict(v)
+        v_dict['roi'] = calculate_vehicle_roi(conn, v['id'], v['acquisition_cost'])
+        v_dict['roi_percent'] = f"{v_dict['roi'] * 100:.2f}%"
+        vehicles_data.append(v_dict)
+
+    if sort_by == 'roi_desc':
+        vehicles_data.sort(key=lambda x: x['roi'], reverse=True)
+    elif sort_by == 'roi_asc':
+        vehicles_data.sort(key=lambda x: x['roi'])
+    else:
+        vehicles_data.sort(key=lambda x: x['registration_number'])
 
     # 2. Compute specific Vehicle view KPIs
     total_fleet = conn.execute('SELECT COUNT(*) FROM vehicles').fetchone()[0]
@@ -686,13 +799,15 @@ def vehicles_list():
     return render_template(
         'vehicles/list.html',
         active_page='vehicles',
-        vehicles=vehicles,
+        vehicles=vehicles_data,
         q=q,
         status=status,
+        sort_by=sort_by,
         vehicle_kpis=vehicle_kpis
     )
 
 @app.route('/vehicles/add', methods=['POST'])
+@roles_required('Fleet Manager')
 def vehicles_add():
     registration_number = request.form.get('registration_number', '').strip().upper()
     name = request.form.get('name', '').strip()
@@ -741,6 +856,7 @@ def vehicles_add():
     return redirect(url_for('vehicles_list'))
 
 @app.route('/vehicles/edit/<int:id>', methods=['GET', 'POST'])
+@roles_required('Fleet Manager')
 def vehicles_edit(id):
     conn = get_db_connection()
     vehicle = conn.execute('SELECT * FROM vehicles WHERE id = ?', (id,)).fetchone()
@@ -793,6 +909,7 @@ def vehicles_edit(id):
     return render_template('vehicles/edit.html', active_page='vehicles', vehicle=vehicle)
 
 @app.route('/vehicles/delete/<int:id>', methods=['POST'])
+@roles_required('Fleet Manager')
 def vehicles_delete(id):
     conn = get_db_connection()
     vehicle = conn.execute('SELECT registration_number FROM vehicles WHERE id = ?', (id,)).fetchone()
@@ -811,8 +928,18 @@ def vehicles_delete(id):
     return redirect(url_for('vehicles_list'))
 
 @app.route('/vehicles/<int:id>')
+@roles_required('Fleet Manager', 'Driver', 'Safety Officer', 'Financial Analyst')
 def vehicles_details(id):
     conn = get_db_connection()
+
+    if session.get('user_role') == 'Driver':
+        driver_row = conn.execute('SELECT assigned_vehicle_id FROM drivers WHERE email = ?', (session['user_email'],)).fetchone()
+        assigned_vehicle_id = driver_row['assigned_vehicle_id'] if (driver_row and driver_row['assigned_vehicle_id']) else -1
+        if id != assigned_vehicle_id:
+            conn.close()
+            flash('Access denied: This is not your assigned vehicle.', 'error')
+            return redirect(url_for('vehicles_list'))
+
     vehicle = conn.execute('SELECT * FROM vehicles WHERE id = ?', (id,)).fetchone()
 
     if not vehicle:
@@ -855,6 +982,9 @@ def vehicles_details(id):
 
     total_expenses = maintenance_cost + fuel_cost + other_expenses
 
+    roi = calculate_vehicle_roi(conn, id, vehicle['acquisition_cost'])
+    roi_percent = f"{roi * 100:.2f}%"
+
     conn.close()
 
     return render_template(
@@ -866,13 +996,16 @@ def vehicles_details(id):
         trips=trips,
         maintenance_cost=maintenance_cost,
         fuel_cost=fuel_cost,
-        total_expenses=total_expenses
+        total_expenses=total_expenses,
+        roi=roi,
+        roi_percent=roi_percent
     )
 
 # -----------------------------------------------------------------------------
 # DRIVER MANAGEMENT ROUTES
 # -----------------------------------------------------------------------------
 @app.route('/drivers')
+@roles_required('Fleet Manager', 'Safety Officer', 'Driver')
 def drivers_list():
     q = request.args.get('q', '').strip()
     status = request.args.get('status', '')
@@ -883,6 +1016,16 @@ def drivers_list():
     sort_order = request.args.get('sort_order', 'asc')
 
     conn = get_db_connection()
+
+    if session.get('user_role') == 'Driver':
+        driver_row = conn.execute('SELECT id FROM drivers WHERE email = ?', (session['user_email'],)).fetchone()
+        if driver_row:
+            conn.close()
+            return redirect(url_for('drivers_details', id=driver_row['id']))
+        else:
+            conn.close()
+            flash('Driver profile not found.', 'error')
+            return redirect(url_for('dashboard'))
 
     # Base query
     query = '''
@@ -895,14 +1038,14 @@ def drivers_list():
 
     # Filter status
     if status:
-        if status == 'ALL_INCLUDING_INACTIVE':
+        if status == 'ALL_INCLUDING_SUSPENDED':
             pass
         else:
             query += ' AND d.status = ?'
             params.append(status)
     else:
-        # Hide Inactive by default
-        query += ' AND d.status != "Inactive"'
+        # Hide Suspended by default
+        query += ' AND d.status != "Suspended"'
 
     # Filter region
     if region:
@@ -941,16 +1084,16 @@ def drivers_list():
     drivers = conn.execute(query, params).fetchall()
 
     # Driver view KPIs (global)
-    total_drivers = conn.execute('SELECT COUNT(*) FROM drivers WHERE status != "Inactive"').fetchone()[0]
+    total_drivers = conn.execute('SELECT COUNT(*) FROM drivers WHERE status != "Suspended"').fetchone()[0]
     available_drivers = conn.execute('SELECT COUNT(*) FROM drivers WHERE status = "Available"').fetchone()[0]
     on_trip_drivers = conn.execute('SELECT COUNT(*) FROM drivers WHERE status = "On Trip"').fetchone()[0]
-    on_leave_drivers = conn.execute('SELECT COUNT(*) FROM drivers WHERE status = "On Leave"').fetchone()[0]
+    off_duty_drivers = conn.execute('SELECT COUNT(*) FROM drivers WHERE status = "Off Duty"').fetchone()[0]
 
     driver_kpis = {
         'total': total_drivers,
         'available': available_drivers,
         'on_trip': on_trip_drivers,
-        'on_leave': on_leave_drivers
+        'off_duty': off_duty_drivers
     }
 
     # Fetch available vehicles for assignment dropdown in Add Driver or Details
@@ -961,7 +1104,7 @@ def drivers_list():
         AND id NOT IN (
             SELECT assigned_vehicle_id FROM drivers 
             WHERE assigned_vehicle_id IS NOT NULL 
-            AND status != "Inactive"
+            AND status != "Suspended"
         )
     ''').fetchall()
 
@@ -983,6 +1126,7 @@ def drivers_list():
     )
 
 @app.route('/drivers/add', methods=['POST'])
+@roles_required('Fleet Manager')
 def drivers_add():
     name = request.form.get('name', '').strip()
     employee_id = request.form.get('employee_id', '').strip().upper()
@@ -1044,7 +1188,7 @@ def drivers_add():
                 return redirect(url_for('drivers_list'))
             # Check if assigned to another active driver
             other = conn.execute('''
-                SELECT id FROM drivers WHERE assigned_vehicle_id = ? AND status != "Inactive"
+                SELECT id FROM drivers WHERE assigned_vehicle_id = ? AND status != "Suspended"
             ''', (assigned_vehicle_id,)).fetchone()
             if other:
                 conn.close()
@@ -1066,6 +1210,7 @@ def drivers_add():
     return redirect(url_for('drivers_list'))
 
 @app.route('/drivers/edit/<int:id>', methods=['GET', 'POST'])
+@roles_required('Fleet Manager', 'Safety Officer')
 def drivers_edit(id):
     conn = get_db_connection()
     driver = conn.execute('SELECT * FROM drivers WHERE id = ?', (id,)).fetchone()
@@ -1111,9 +1256,9 @@ def drivers_edit(id):
             flash(f'License Number "{license_number}" is already registered to another driver.', 'error')
             return redirect(url_for('drivers_edit', id=id))
 
-        # Business Rule: Inactive driver cannot have vehicle assigned
+        # Business Rule: Suspended driver cannot have vehicle assigned
         assigned_vehicle_id = driver['assigned_vehicle_id']
-        if status == 'Inactive':
+        if status == 'Suspended':
             assigned_vehicle_id = None
 
         conn.execute('''
@@ -1132,8 +1277,18 @@ def drivers_edit(id):
     return render_template('drivers/edit.html', active_page='drivers', driver=driver)
 
 @app.route('/drivers/<int:id>')
+@roles_required('Fleet Manager', 'Safety Officer', 'Driver')
 def drivers_details(id):
     conn = get_db_connection()
+
+    if session.get('user_role') == 'Driver':
+        driver_row = conn.execute('SELECT id FROM drivers WHERE email = ?', (session['user_email'],)).fetchone()
+        my_driver_id = driver_row['id'] if driver_row else -1
+        if id != my_driver_id:
+            conn.close()
+            flash('Access denied: You can only view your own profile.', 'error')
+            return redirect(url_for('dashboard'))
+
     driver = conn.execute('''
         SELECT d.*, v.registration_number AS vehicle_reg, v.name AS vehicle_name, v.status AS vehicle_status
         FROM drivers d
@@ -1165,7 +1320,7 @@ def drivers_details(id):
         AND id NOT IN (
             SELECT assigned_vehicle_id FROM drivers 
             WHERE assigned_vehicle_id IS NOT NULL 
-            AND status != "Inactive" 
+            AND status != "Suspended" 
             AND id != ?
         )
     ''', (id,)).fetchall()
@@ -1182,6 +1337,7 @@ def drivers_details(id):
     )
 
 @app.route('/drivers/delete/<int:id>', methods=['POST'])
+@roles_required('Fleet Manager')
 def drivers_delete(id):
     conn = get_db_connection()
     driver = conn.execute('SELECT name FROM drivers WHERE id = ?', (id,)).fetchone()
@@ -1191,8 +1347,8 @@ def drivers_delete(id):
         flash('Driver not found.', 'error')
         return redirect(url_for('drivers_list'))
 
-    # Soft Delete: Set status to 'Inactive' and remove vehicle assignment
-    conn.execute('UPDATE drivers SET status = "Inactive", assigned_vehicle_id = NULL WHERE id = ?', (id,))
+    # Soft Delete: Set status to 'Suspended' and remove vehicle assignment
+    conn.execute('UPDATE drivers SET status = "Suspended", assigned_vehicle_id = NULL WHERE id = ?', (id,))
     conn.commit()
     conn.close()
 
@@ -1200,6 +1356,7 @@ def drivers_delete(id):
     return redirect(url_for('drivers_list'))
 
 @app.route('/drivers/assign-vehicle/<int:id>', methods=['POST'])
+@roles_required('Fleet Manager', 'Safety Officer')
 def drivers_assign_vehicle(id):
     action = request.form.get('action', 'assign')
     vehicle_id_raw = request.form.get('vehicle_id', '')
@@ -1212,9 +1369,9 @@ def drivers_assign_vehicle(id):
         flash('Driver not found.', 'error')
         return redirect(url_for('drivers_list'))
 
-    if driver['status'] == 'Inactive':
+    if driver['status'] == 'Suspended':
         conn.close()
-        flash('Cannot assign vehicles to inactive drivers.', 'error')
+        flash('Cannot assign vehicles to suspended drivers.', 'error')
         return redirect(url_for('drivers_details', id=id))
 
     if action == 'remove':
@@ -1249,7 +1406,7 @@ def drivers_assign_vehicle(id):
         other = conn.execute('''
             SELECT name FROM drivers 
             WHERE assigned_vehicle_id = ? 
-            AND status != "Inactive" 
+            AND status != "Suspended" 
             AND id != ?
         ''', (vehicle_id, id)).fetchone()
         
@@ -1271,6 +1428,7 @@ def drivers_assign_vehicle(id):
     return redirect(url_for('drivers_details', id=id))
 
 @app.route('/trips')
+@roles_required('Fleet Manager', 'Driver')
 def trips_list():
     conn = get_db_connection()
 
@@ -1283,6 +1441,10 @@ def trips_list():
     selected_vehicle_id = request.args.get('vehicle_id', '').strip()
     search_query = request.args.get('q', '').strip()
     sort_by = request.args.get('sort_by', 'dispatch_date').strip()
+
+    if session.get('user_role') == 'Driver':
+        driver_row = conn.execute('SELECT id FROM drivers WHERE email = ?', (session['user_email'],)).fetchone()
+        selected_driver_id = str(driver_row['id']) if driver_row else '-1'
 
     # Build Query
     query = """
@@ -1358,17 +1520,29 @@ def trips_list():
     trips = conn.execute(query, params).fetchall()
 
     # Dynamic KPI Calculations
-    kpis = {
-        'total': conn.execute("SELECT COUNT(*) FROM trips").fetchone()[0],
-        'in_progress': conn.execute("SELECT COUNT(*) FROM trips WHERE status = 'In Progress'").fetchone()[0],
-        'scheduled': conn.execute("SELECT COUNT(*) FROM trips WHERE status = 'Scheduled'").fetchone()[0],
-        'completed': conn.execute("SELECT COUNT(*) FROM trips WHERE status = 'Completed'").fetchone()[0],
-        'cancelled': conn.execute("SELECT COUNT(*) FROM trips WHERE status = 'Cancelled'").fetchone()[0]
-    }
+    if session.get('user_role') == 'Driver':
+        driver_row = conn.execute('SELECT id FROM drivers WHERE email = ?', (session['user_email'],)).fetchone()
+        my_driver_id = driver_row['id'] if driver_row else -1
+        kpis = {
+            'total': conn.execute("SELECT COUNT(*) FROM trips WHERE driver_id = ?", (my_driver_id,)).fetchone()[0],
+            'dispatched': conn.execute("SELECT COUNT(*) FROM trips WHERE status IN ('Dispatched', 'In Progress') AND driver_id = ?", (my_driver_id,)).fetchone()[0],
+            'draft': conn.execute("SELECT COUNT(*) FROM trips WHERE status IN ('Draft', 'Scheduled') AND driver_id = ?", (my_driver_id,)).fetchone()[0],
+            'completed': conn.execute("SELECT COUNT(*) FROM trips WHERE status = 'Completed' AND driver_id = ?", (my_driver_id,)).fetchone()[0],
+            'cancelled': conn.execute("SELECT COUNT(*) FROM trips WHERE status = 'Cancelled' AND driver_id = ?", (my_driver_id,)).fetchone()[0]
+        }
+    else:
+        kpis = {
+            'total': conn.execute("SELECT COUNT(*) FROM trips").fetchone()[0],
+            'dispatched': conn.execute("SELECT COUNT(*) FROM trips WHERE status IN ('Dispatched', 'In Progress')").fetchone()[0],
+            'draft': conn.execute("SELECT COUNT(*) FROM trips WHERE status IN ('Draft', 'Scheduled')").fetchone()[0],
+            'completed': conn.execute("SELECT COUNT(*) FROM trips WHERE status = 'Completed'").fetchone()[0],
+            'cancelled': conn.execute("SELECT COUNT(*) FROM trips WHERE status = 'Cancelled'").fetchone()[0]
+        }
 
+    today_str = datetime.date.today().strftime('%Y-%m-%d')
     # Options for Create Form and Filters
     available_vehicles = conn.execute("SELECT * FROM vehicles WHERE status = 'Available' ORDER BY registration_number").fetchall()
-    available_drivers = conn.execute("SELECT * FROM drivers WHERE status = 'Available' ORDER BY name").fetchall()
+    available_drivers = conn.execute("SELECT * FROM drivers WHERE status = 'Available' AND license_expiry_date >= ? ORDER BY name", (today_str,)).fetchall()
     all_drivers = conn.execute("SELECT id, name FROM drivers ORDER BY name").fetchall()
     all_vehicles = conn.execute("SELECT id, registration_number AS reg_num FROM vehicles ORDER BY registration_number").fetchall()
     all_regions = ['North', 'South', 'East', 'West', 'Central']
@@ -1396,6 +1570,7 @@ def trips_list():
     )
 
 @app.route('/trips/add', methods=['POST'])
+@roles_required('Fleet Manager')
 def trips_add():
     vehicle_id = request.form.get('vehicle_id', '').strip()
     driver_id = request.form.get('driver_id', '').strip()
@@ -1408,7 +1583,12 @@ def trips_add():
     expected_return = request.form.get('expected_return', '').strip()
     planned_distance = request.form.get('planned_distance', '').strip()
     notes = request.form.get('notes', '').strip()
-    initial_status = request.form.get('status', 'Scheduled').strip()
+    initial_status = request.form.get('status', 'Draft').strip()
+
+    source_latitude = request.form.get('source_latitude', '').strip()
+    source_longitude = request.form.get('source_longitude', '').strip()
+    destination_latitude = request.form.get('destination_latitude', '').strip()
+    destination_longitude = request.form.get('destination_longitude', '').strip()
 
     if not vehicle_id:
         flash('Vehicle selection is required.', 'error')
@@ -1433,6 +1613,15 @@ def trips_add():
         planned_distance = float(planned_distance) if planned_distance else 0.0
     except ValueError:
         flash('Estimated distance must be a valid number.', 'error')
+        return redirect(url_for('trips_list'))
+
+    try:
+        source_latitude = float(source_latitude) if source_latitude else None
+        source_longitude = float(source_longitude) if source_longitude else None
+        destination_latitude = float(destination_latitude) if destination_latitude else None
+        destination_longitude = float(destination_longitude) if destination_longitude else None
+    except ValueError:
+        flash('Latitude and longitude coordinates must be valid numbers.', 'error')
         return redirect(url_for('trips_list'))
 
     if dispatch_date and expected_return and dispatch_date > expected_return:
@@ -1470,34 +1659,43 @@ def trips_add():
         flash(f"Driver {driver['name']} is not Available (current status: {driver['status']}). Only Available drivers can be assigned.", 'error')
         return redirect(url_for('trips_list'))
 
+    today_str = datetime.date.today().strftime('%Y-%m-%d')
+    if driver['license_expiry_date'] < today_str:
+        conn.close()
+        flash(f"Driver {driver['name']} has an expired license (expired on {driver['license_expiry_date']}). Cannot assign to trips.", 'error')
+        return redirect(url_for('trips_list'))
+
     # Save Trip
     cursor = conn.cursor()
     cursor.execute("""
         INSERT INTO trips (
             source, destination, vehicle_id, driver_id, cargo_weight, 
             planned_distance, status, dispatch_date, expected_return, 
-            purpose, cargo_description, notes, revenue
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            purpose, cargo_description, notes, revenue,
+            source_latitude, source_longitude, destination_latitude, destination_longitude
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         source, destination, vehicle_id, driver_id, cargo_weight,
         planned_distance, initial_status, dispatch_date, expected_return,
-        purpose, cargo_description, notes, 0.0
+        purpose, cargo_description, notes, 0.0,
+        source_latitude, source_longitude, destination_latitude, destination_longitude
     ))
     trip_id = cursor.lastrowid
 
     # Apply business rules depending on starting status
-    if initial_status == 'In Progress':
+    if initial_status in ('In Progress', 'Dispatched'):
         cursor.execute("UPDATE drivers SET status = 'On Trip' WHERE id = ?", (driver_id,))
         cursor.execute("UPDATE vehicles SET status = 'On Trip' WHERE id = ?", (vehicle_id,))
         flash(f"Trip TRIP-{trip_id} created and dispatched successfully!", 'success')
     else:
-        flash(f"Trip TRIP-{trip_id} scheduled successfully!", 'success')
+        flash(f"Trip TRIP-{trip_id} created as draft successfully!", 'success')
 
     conn.commit()
     conn.close()
     return redirect(url_for('trips_list'))
 
 @app.route('/trips/<int:id>')
+@roles_required('Fleet Manager', 'Driver')
 def trips_details(id):
     conn = get_db_connection()
     trip = conn.execute("""
@@ -1526,10 +1724,19 @@ def trips_details(id):
         flash('Trip not found.', 'error')
         return redirect(url_for('trips_list'))
 
+    if session.get('user_role') == 'Driver':
+        driver_row = conn.execute('SELECT id FROM drivers WHERE email = ?', (session['user_email'],)).fetchone()
+        my_driver_id = driver_row['id'] if driver_row else -1
+        if trip['driver_id'] != my_driver_id:
+            conn.close()
+            flash('Access denied: This trip is not assigned to you.', 'error')
+            return redirect(url_for('trips_list'))
+
     conn.close()
     return render_template('trips/details.html', active_page='trips', trip=trip)
 
 @app.route('/trips/start/<int:id>', methods=['POST'])
+@roles_required('Fleet Manager', 'Driver')
 def trips_start(id):
     conn = get_db_connection()
     trip = conn.execute("SELECT * FROM trips WHERE id = ?", (id,)).fetchone()
@@ -1538,17 +1745,42 @@ def trips_start(id):
         flash('Trip not found.', 'error')
         return redirect(url_for('trips_list'))
     
-    if trip['status'] != 'Scheduled':
+    if session.get('user_role') == 'Driver':
+        driver_row = conn.execute('SELECT id FROM drivers WHERE email = ?', (session['user_email'],)).fetchone()
+        my_driver_id = driver_row['id'] if driver_row else -1
+        if trip['driver_id'] != my_driver_id:
+            conn.close()
+            flash('Access denied: You can only start your own trips.', 'error')
+            return redirect(url_for('trips_list'))
+
+    if trip['status'] not in ('Scheduled', 'Draft'):
         conn.close()
-        flash('Only Scheduled trips can be started.', 'error')
+        flash('Only Scheduled or Draft trips can be started.', 'error')
         return redirect(url_for('trips_details', id=id))
 
     driver = conn.execute("SELECT * FROM drivers WHERE id = ?", (trip['driver_id'],)).fetchone()
     vehicle = conn.execute("SELECT * FROM vehicles WHERE id = ?", (trip['vehicle_id'],)).fetchone()
 
+    # Check if this driver is currently on any other active trip (Dispatched or In Progress)
+    active_driver_trip = conn.execute(
+        "SELECT id, source, destination FROM trips WHERE driver_id = ? AND status IN ('Dispatched', 'In Progress') AND id != ?",
+        (trip['driver_id'], id)
+    ).fetchone()
+
+    if active_driver_trip:
+        conn.close()
+        flash(f"Driver {driver['name']} is currently on another active trip (TRIP-{active_driver_trip['id']}: {active_driver_trip['source']} to {active_driver_trip['destination']}) and cannot start a new one until it is completed.", 'error')
+        return redirect(url_for('trips_details', id=id))
+
     if driver['status'] != 'Available':
         conn.close()
         flash(f"Driver {driver['name']} is currently {driver['status']} and cannot be dispatched.", 'error')
+        return redirect(url_for('trips_details', id=id))
+
+    today_str = datetime.date.today().strftime('%Y-%m-%d')
+    if driver['license_expiry_date'] < today_str:
+        conn.close()
+        flash(f"Driver {driver['name']} has an expired license (expired on {driver['license_expiry_date']}). Cannot dispatch.", 'error')
         return redirect(url_for('trips_details', id=id))
 
     if vehicle['status'] != 'Available':
@@ -1557,16 +1789,17 @@ def trips_start(id):
         return redirect(url_for('trips_details', id=id))
 
     cursor = conn.cursor()
-    cursor.execute("UPDATE trips SET status = 'In Progress' WHERE id = ?", (id,))
+    cursor.execute("UPDATE trips SET status = 'Dispatched' WHERE id = ?", (id,))
     cursor.execute("UPDATE drivers SET status = 'On Trip' WHERE id = ?", (trip['driver_id'],))
     cursor.execute("UPDATE vehicles SET status = 'On Trip' WHERE id = ?", (trip['vehicle_id'],))
     conn.commit()
     conn.close()
 
-    flash(f"Trip TRIP-{id} is now In Progress!", 'success')
+    flash(f"Trip TRIP-{id} is now Dispatched!", 'success')
     return redirect(url_for('trips_details', id=id))
 
 @app.route('/trips/complete/<int:id>', methods=['POST'])
+@roles_required('Fleet Manager', 'Driver')
 def trips_complete(id):
     actual_return = request.form.get('actual_return', '').strip()
     if not actual_return:
@@ -1579,9 +1812,17 @@ def trips_complete(id):
         flash('Trip not found.', 'error')
         return redirect(url_for('trips_list'))
 
-    if trip['status'] != 'In Progress':
+    if session.get('user_role') == 'Driver':
+        driver_row = conn.execute('SELECT id FROM drivers WHERE email = ?', (session['user_email'],)).fetchone()
+        my_driver_id = driver_row['id'] if driver_row else -1
+        if trip['driver_id'] != my_driver_id:
+            conn.close()
+            flash('Access denied: You can only complete your own trips.', 'error')
+            return redirect(url_for('trips_list'))
+
+    if trip['status'] not in ('In Progress', 'Dispatched'):
         conn.close()
-        flash('Only In Progress trips can be completed.', 'error')
+        flash('Only Dispatched trips can be completed.', 'error')
         return redirect(url_for('trips_details', id=id))
 
     cursor = conn.cursor()
@@ -1605,6 +1846,7 @@ def trips_complete(id):
     return redirect(url_for('trips_details', id=id))
 
 @app.route('/trips/cancel/<int:id>', methods=['POST'])
+@roles_required('Fleet Manager')
 def trips_cancel(id):
     conn = get_db_connection()
     trip = conn.execute("SELECT * FROM trips WHERE id = ?", (id,)).fetchone()
@@ -1629,7 +1871,29 @@ def trips_cancel(id):
     flash(f"Trip TRIP-{id} has been Cancelled. Assigned vehicle and driver are now Available.", 'info')
     return redirect(url_for('trips_details', id=id))
 
+@app.route('/trips/delete/<int:id>', methods=['POST'])
+@roles_required('Fleet Manager')
+def trips_delete(id):
+    conn = get_db_connection()
+    trip = conn.execute("SELECT * FROM trips WHERE id = ?", (id,)).fetchone()
+    if not trip:
+        conn.close()
+        flash('Trip record not found.', 'error')
+        return redirect(url_for('trips_list'))
+    
+    # If trip was active/dispatched, free the driver and vehicle
+    if trip['status'] in ['Dispatched', 'In Progress']:
+        conn.execute("UPDATE drivers SET status = 'Available' WHERE id = ?", (trip['driver_id'],))
+        conn.execute("UPDATE vehicles SET status = 'Available' WHERE id = ?", (trip['vehicle_id'],))
+        
+    conn.execute("DELETE FROM trips WHERE id = ?", (id,))
+    conn.commit()
+    conn.close()
+    flash(f"Trip TRIP-{id} was deleted successfully.", "success")
+    return redirect(url_for('trips_list'))
+
 @app.route('/maintenance')
+@roles_required('Fleet Manager', 'Safety Officer')
 def maintenance_list():
     conn = get_db_connection()
     update_overdue_maintenance(conn)
@@ -1742,6 +2006,7 @@ def maintenance_list():
     )
 
 @app.route('/maintenance/add', methods=['POST'])
+@roles_required('Fleet Manager', 'Safety Officer')
 def maintenance_add():
     vehicle_id = request.form.get('vehicle_id')
     maintenance_type = request.form.get('maintenance_type')
@@ -1810,14 +2075,20 @@ def maintenance_add():
         maintenance_type, service_center, technician_name, scheduled_date,
         estimated_cost, estimated_duration, vehicle['odometer'], notes, 0.0
     ))
-    conn.commit()
     new_id = cursor.lastrowid
+    
+    # IMMEDIATELY set Vehicle Status to "In Shop" and remove from assignments
+    cursor.execute("UPDATE vehicles SET status = 'In Shop' WHERE id = ?", (vehicle_id,))
+    cursor.execute("UPDATE drivers SET assigned_vehicle_id = NULL WHERE assigned_vehicle_id = ?", (vehicle_id,))
+    
+    conn.commit()
     conn.close()
     
     flash(f"Maintenance job MNT-{new_id} scheduled successfully for vehicle {vehicle['registration_number']}.", 'success')
     return redirect(url_for('maintenance_list'))
 
 @app.route('/maintenance/<int:id>')
+@roles_required('Fleet Manager', 'Safety Officer')
 def maintenance_details(id):
     conn = get_db_connection()
     log = conn.execute('''
@@ -1841,6 +2112,7 @@ def maintenance_details(id):
     return render_template('maintenance/details.html', active_page='maintenance', log=log, history=history)
 
 @app.route('/maintenance/edit/<int:id>', methods=['GET', 'POST'])
+@roles_required('Fleet Manager', 'Safety Officer')
 def maintenance_edit(id):
     conn = get_db_connection()
     log = conn.execute('''
@@ -1907,6 +2179,7 @@ def maintenance_edit(id):
     return render_template('maintenance/edit.html', active_page='maintenance', log=log)
 
 @app.route('/maintenance/start/<int:id>', methods=['POST'])
+@roles_required('Fleet Manager', 'Safety Officer')
 def maintenance_start(id):
     conn = get_db_connection()
     log = conn.execute("SELECT * FROM maintenance_logs WHERE id = ?", (id,)).fetchone()
@@ -1937,6 +2210,7 @@ def maintenance_start(id):
     return redirect(url_for('maintenance_details', id=id))
 
 @app.route('/maintenance/complete/<int:id>', methods=['POST'])
+@roles_required('Fleet Manager', 'Safety Officer')
 def maintenance_complete(id):
     completed_date = request.form.get('completed_date', '').strip()
     work_performed = request.form.get('work_performed', '').strip()
@@ -1995,12 +2269,12 @@ def maintenance_complete(id):
     
     cursor.execute('''
         UPDATE vehicles 
-        SET status = 'Available', odometer = ? 
+        SET status = CASE WHEN status = 'Retired' THEN 'Retired' ELSE 'Available' END, odometer = ? 
         WHERE id = ?
     ''', (new_odometer, log['vehicle_id']))
     
     # Look up assigned driver
-    driver_row = conn.execute("SELECT id FROM drivers WHERE assigned_vehicle_id = ? AND status != 'Inactive'", (log['vehicle_id'],)).fetchone()
+    driver_row = conn.execute("SELECT id FROM drivers WHERE assigned_vehicle_id = ? AND status != 'Suspended'", (log['vehicle_id'],)).fetchone()
     m_driver_id = driver_row['id'] if driver_row else None
     
     # Calculate base amount and GST assuming 18% GST (standard commercial service tax in India)
@@ -2019,6 +2293,7 @@ def maintenance_complete(id):
     return redirect(url_for('maintenance_details', id=id))
 
 @app.route('/maintenance/cancel/<int:id>', methods=['POST'])
+@roles_required('Fleet Manager', 'Safety Officer')
 def maintenance_cancel(id):
     remarks = request.form.get('remarks', '').strip()
     if not remarks:
@@ -2041,13 +2316,35 @@ def maintenance_cancel(id):
     cursor.execute("UPDATE maintenance_logs SET status = 'Cancelled', remarks = ? WHERE id = ?", (remarks, id))
     
     if log['status'] == 'In Progress':
-        cursor.execute("UPDATE vehicles SET status = 'Available' WHERE id = ?", (log['vehicle_id'],))
+        cursor.execute("UPDATE vehicles SET status = CASE WHEN status = 'Retired' THEN 'Retired' ELSE 'Available' END WHERE id = ?", (log['vehicle_id'],))
         
     conn.commit()
     conn.close()
     
     flash(f"Maintenance job MNT-{id} has been Cancelled.", 'info')
     return redirect(url_for('maintenance_details', id=id))
+
+@app.route('/maintenance/delete/<int:id>', methods=['POST'])
+@roles_required('Fleet Manager')
+def maintenance_delete(id):
+    conn = get_db_connection()
+    log = conn.execute("SELECT * FROM maintenance_logs WHERE id = ?", (id,)).fetchone()
+    if not log:
+        conn.close()
+        flash('Maintenance log not found.', 'error')
+        return redirect(url_for('maintenance_list'))
+        
+    # If the vehicle was in active maintenance, check if it can be marked as Available
+    if log['status'] in ['Scheduled', 'In Progress', 'Underway']:
+        other_active = conn.execute("SELECT COUNT(*) as count FROM maintenance_logs WHERE vehicle_id = ? AND status IN ('Scheduled', 'In Progress', 'Underway') AND id != ?", (log['vehicle_id'], id)).fetchone()
+        if other_active['count'] == 0:
+            conn.execute("UPDATE vehicles SET status = 'Available' WHERE id = ?", (log['vehicle_id'],))
+            
+    conn.execute("DELETE FROM maintenance_logs WHERE id = ?", (id,))
+    conn.commit()
+    conn.close()
+    flash(f"Maintenance record MNT-{id} deleted successfully.", "success")
+    return redirect(url_for('maintenance_list'))
 
 def get_previous_fuel_log_odometer(conn, vehicle_id, current_date, current_id=None):
     if current_id:
@@ -2067,6 +2364,7 @@ def get_previous_fuel_log_odometer(conn, vehicle_id, current_date, current_id=No
     return row['odometer'] if row else None
 
 @app.route('/fuel')
+@roles_required('Fleet Manager', 'Financial Analyst')
 def fuel_list():
     conn = get_db_connection()
     
@@ -2207,7 +2505,7 @@ def fuel_list():
     active_vehicles = conn.execute("""
         SELECT v.id, v.registration_number, v.name, v.odometer, d.id AS assigned_driver_id
         FROM vehicles v
-        LEFT JOIN drivers d ON d.assigned_vehicle_id = v.id AND d.status != 'Inactive'
+        LEFT JOIN drivers d ON d.assigned_vehicle_id = v.id AND d.status != 'Suspended'
         WHERE v.status != 'Retired'
         ORDER BY v.registration_number
     """).fetchall()
@@ -2283,6 +2581,7 @@ def fuel_list():
     )
 
 @app.route('/fuel/<int:id>')
+@roles_required('Fleet Manager', 'Financial Analyst')
 def fuel_details(id):
     conn = get_db_connection()
     log = conn.execute("""
@@ -2316,6 +2615,7 @@ def fuel_details(id):
     return render_template('fuel/details.html', log=log_dict, active_page='fuel')
 
 @app.route('/fuel/add', methods=['POST'])
+@roles_required('Fleet Manager', 'Financial Analyst')
 def fuel_add():
     vehicle_id = request.form.get('vehicle_id')
     driver_id = request.form.get('driver_id')
@@ -2402,6 +2702,7 @@ def fuel_add():
     return redirect(url_for('fuel_list'))
 
 @app.route('/fuel/edit/<int:id>', methods=['GET', 'POST'])
+@roles_required('Fleet Manager', 'Financial Analyst')
 def fuel_edit(id):
     conn = get_db_connection()
     log = conn.execute("SELECT * FROM fuel_logs WHERE id = ?", (id,)).fetchone()
@@ -2495,6 +2796,7 @@ def fuel_edit(id):
     return render_template('fuel/edit.html', log=log, vehicles=vehicles, drivers=drivers, active_page='fuel')
 
 @app.route('/fuel/delete/<int:id>', methods=['POST'])
+@roles_required('Fleet Manager', 'Financial Analyst')
 def fuel_delete(id):
     conn = get_db_connection()
     log = conn.execute("SELECT * FROM fuel_logs WHERE id = ?", (id,)).fetchone()
@@ -2512,6 +2814,7 @@ def fuel_delete(id):
     return redirect(url_for('fuel_list'))
 
 @app.route('/expenses')
+@roles_required('Fleet Manager', 'Financial Analyst')
 def expenses_list():
     from datetime import datetime
     conn = get_db_connection()
@@ -2683,7 +2986,7 @@ def expenses_list():
     
     # Dropdowns list options
     vehicles = conn.execute("SELECT id, registration_number, name FROM vehicles WHERE status != 'Retired' ORDER BY registration_number").fetchall()
-    drivers = conn.execute("SELECT id, name, employee_id FROM drivers WHERE status != 'Inactive' ORDER BY name").fetchall()
+    drivers = conn.execute("SELECT id, name, employee_id FROM drivers WHERE status != 'Suspended' ORDER BY name").fetchall()
     trips = conn.execute("SELECT id, source, destination, dispatch_date FROM trips ORDER BY id DESC").fetchall()
     
     categories = [
@@ -2720,6 +3023,7 @@ def expenses_list():
     )
 
 @app.route('/expenses/add', methods=['POST'])
+@roles_required('Fleet Manager', 'Financial Analyst')
 def expenses_add():
     from datetime import datetime
     vehicle_id = request.form.get('vehicle_id')
@@ -2783,6 +3087,7 @@ def expenses_add():
     return redirect(url_for('expenses_list'))
 
 @app.route('/expenses/details/<int:id>')
+@roles_required('Fleet Manager', 'Financial Analyst')
 def expenses_details(id):
     conn = get_db_connection()
     conn.row_factory = sqlite3.Row
@@ -2802,6 +3107,7 @@ def expenses_details(id):
     return render_template('expenses/details.html', expense=expense, active_page='expenses')
 
 @app.route('/expenses/edit/<int:id>', methods=['GET', 'POST'])
+@roles_required('Fleet Manager', 'Financial Analyst')
 def expenses_edit(id):
     from datetime import datetime
     conn = get_db_connection()
@@ -2878,7 +3184,7 @@ def expenses_edit(id):
         return redirect(url_for('expenses_list'))
         
     vehicles = conn.execute("SELECT id, registration_number, name FROM vehicles WHERE status != 'Retired' ORDER BY registration_number").fetchall()
-    drivers = conn.execute("SELECT id, name, employee_id FROM drivers WHERE status != 'Inactive' ORDER BY name").fetchall()
+    drivers = conn.execute("SELECT id, name, employee_id FROM drivers WHERE status != 'Suspended' ORDER BY name").fetchall()
     trips = conn.execute("SELECT id, source, destination, dispatch_date FROM trips ORDER BY id DESC").fetchall()
     
     categories = [
@@ -2890,6 +3196,7 @@ def expenses_edit(id):
     return render_template('expenses/edit.html', expense=expense, vehicles=vehicles, drivers=drivers, trips=trips, categories=categories, active_page='expenses')
 
 @app.route('/expenses/delete/<int:id>', methods=['POST'])
+@roles_required('Fleet Manager', 'Financial Analyst')
 def expenses_delete(id):
     conn = get_db_connection()
     expense = conn.execute("SELECT * FROM expenses WHERE id = ?", (id,)).fetchone()
@@ -2905,6 +3212,7 @@ def expenses_delete(id):
     return redirect(url_for('expenses_list'))
 
 @app.route('/reports')
+@roles_required('Fleet Manager', 'Financial Analyst', 'Safety Officer')
 def reports():
     conn = get_db_connection()
     
@@ -2948,7 +3256,13 @@ def reports():
     trend_stats = conn.execute(trend_query).fetchall()
     
     # 2. Rich reports datasets
-    vehicles = conn.execute("SELECT * FROM vehicles ORDER BY registration_number").fetchall()
+    vehicles_raw = conn.execute("SELECT * FROM vehicles ORDER BY registration_number").fetchall()
+    vehicles = []
+    for v in vehicles_raw:
+        v_dict = dict(v)
+        v_dict['roi'] = calculate_vehicle_roi(conn, v['id'], v['acquisition_cost'])
+        v_dict['roi_percent'] = f"{v_dict['roi'] * 100:.2f}%"
+        vehicles.append(v_dict)
     drivers = conn.execute("""
         SELECT d.*, v.registration_number as vehicle_reg,
                COUNT(t.id) as trips_count,
@@ -3008,6 +3322,7 @@ def reports():
     )
 
 @app.route('/reports/export')
+@roles_required('Fleet Manager', 'Financial Analyst', 'Safety Officer')
 def reports_export():
     report_type = request.args.get('type', 'fleet')
     conn = get_db_connection()
@@ -3102,6 +3417,157 @@ def reports_print():
         maintenance=maintenance,
         expenses=expenses
     )
+
+@app.context_processor
+def inject_driver_trip():
+    if session.get('user_role') == 'Driver':
+        conn = get_db_connection()
+        driver = conn.execute('SELECT id FROM drivers WHERE email = ?', (session.get('user_email'),)).fetchone()
+        if driver:
+            active_trip = conn.execute(
+                "SELECT id FROM trips WHERE driver_id = ? AND status IN ('In Progress', 'Dispatched')", 
+                (driver['id'],)
+            ).fetchone()
+            conn.close()
+            return {
+                'current_driver_id': driver['id'],
+                'active_trip_id': active_trip['id'] if active_trip else None
+            }
+        conn.close()
+    return {'current_driver_id': None, 'active_trip_id': None}
+
+@app.route('/tracking')
+@roles_required('Fleet Manager')
+def tracking_dashboard():
+    conn = get_db_connection()
+    active_trips = conn.execute("""
+        SELECT t.*, d.name as driver_name, v.registration_number as vehicle_reg, v.name as vehicle_name
+        FROM trips t
+        JOIN drivers d ON t.driver_id = d.id
+        JOIN vehicles v ON t.vehicle_id = v.id
+        WHERE t.status IN ('Dispatched', 'In Progress')
+        ORDER BY t.created_at DESC
+    """).fetchall()
+    conn.close()
+    
+    return render_template('tracking.html', active_page='tracking', active_trips=active_trips)
+
+@app.route('/api/location/update', methods=['POST'])
+def location_update():
+    if session.get('user_role') != 'Driver':
+        return jsonify({'error': 'Access denied: Only drivers can upload location.'}), 403
+
+    conn = get_db_connection()
+    driver = conn.execute('SELECT id FROM drivers WHERE email = ?', (session.get('user_email'),)).fetchone()
+    if not driver:
+        conn.close()
+        return jsonify({'error': 'Driver profile not found.'}), 404
+
+    data = request.get_json() or {}
+    trip_id = data.get('trip_id')
+    driver_id = data.get('driver_id')
+    latitude = data.get('latitude')
+    longitude = data.get('longitude')
+    speed = data.get('speed')
+    heading = data.get('heading')
+    accuracy = data.get('accuracy')
+    timestamp = data.get('timestamp')
+
+    if int(driver_id) != driver['id']:
+        conn.close()
+        return jsonify({'error': 'Access denied: Driver ID mismatch.'}), 403
+
+    if not trip_id or latitude is None or longitude is None:
+        conn.close()
+        return jsonify({'error': 'Missing required fields: trip_id, latitude, longitude.'}), 400
+
+    trip = conn.execute("SELECT * FROM trips WHERE id = ?", (trip_id,)).fetchone()
+    if not trip:
+        conn.close()
+        return jsonify({'error': 'Trip not found.'}), 404
+
+    if trip['driver_id'] != driver['id']:
+        conn.close()
+        return jsonify({'error': 'Access denied: This trip is not assigned to you.'}), 403
+
+    if trip['status'] not in ('Dispatched', 'In Progress'):
+        conn.close()
+        return jsonify({'error': 'Trip is not active.'}), 400
+
+    try:
+        latitude = float(latitude)
+        longitude = float(longitude)
+        if speed is not None: speed = float(speed)
+        if heading is not None: heading = float(heading)
+        if accuracy is not None: accuracy = float(accuracy)
+    except (ValueError, TypeError):
+        conn.close()
+        return jsonify({'error': 'Invalid numeric coordinates/metrics.'}), 400
+
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO trip_checkpoints (
+            trip_id, driver_id, latitude, longitude, speed, heading, accuracy, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        trip_id, driver['id'], latitude, longitude, speed, heading, accuracy, timestamp or datetime.datetime.utcnow().isoformat()
+    ))
+    conn.commit()
+    conn.close()
+
+    return jsonify({'status': 'success', 'message': 'Location checkpoint saved.'}), 201
+
+@app.route('/api/location/history/<int:trip_id>', methods=['GET'])
+def location_history(trip_id):
+    if session.get('user_role') != 'Fleet Manager':
+        return jsonify({'error': 'Access denied: Only Fleet Managers can view tracking data.'}), 403
+
+    conn = get_db_connection()
+    checkpoints = conn.execute("""
+        SELECT * FROM trip_checkpoints 
+        WHERE trip_id = ? 
+        ORDER BY created_at ASC
+    """, (trip_id,)).fetchall()
+    
+    trip = conn.execute("""
+        SELECT t.*, d.name as driver_name, v.registration_number as vehicle_reg
+        FROM trips t
+        JOIN drivers d ON t.driver_id = d.id
+        JOIN vehicles v ON t.vehicle_id = v.id
+        WHERE t.id = ?
+    """, (trip_id,)).fetchone()
+    conn.close()
+
+    if not trip:
+        return jsonify({'error': 'Trip not found.'}), 404
+
+    history = []
+    for cp in checkpoints:
+        history.append({
+            'id': cp['id'],
+            'trip_id': cp['trip_id'],
+            'driver_id': cp['driver_id'],
+            'latitude': cp['latitude'],
+            'longitude': cp['longitude'],
+            'speed': cp['speed'],
+            'heading': cp['heading'],
+            'accuracy': cp['accuracy'],
+            'created_at': cp['created_at']
+        })
+
+    return jsonify({
+        'trip_id': trip_id,
+        'driver_name': trip['driver_name'],
+        'vehicle_reg': trip['vehicle_reg'],
+        'status': trip['status'],
+        'source': trip['source'],
+        'destination': trip['destination'],
+        'source_latitude': trip['source_latitude'],
+        'source_longitude': trip['source_longitude'],
+        'destination_latitude': trip['destination_latitude'],
+        'destination_longitude': trip['destination_longitude'],
+        'checkpoints': history
+    })
 
 if __name__ == '__main__':
     # Flask app listens on port 3000 to match container routing requirements

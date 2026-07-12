@@ -1,2 +1,20 @@
-# odoo-hackathon-2026
-TransitOps is a smart transport operations platform built for the Odoo Hackathon 2026. It helps organizations manage vehicles, drivers, trips, maintenance, fuel logs, and fleet operations through a centralized dashboard with real-time tracking, validation, reporting, and operational insights.
+<div align="center">
+<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
+</div>
+
+# Run and deploy your AI Studio app
+
+This contains everything you need to run your app locally.
+
+View your app in AI Studio: https://ai.studio/apps/27194280-1ac7-4b0f-96d7-eb88a0547119
+
+## Run Locally
+
+**Prerequisites:**  Node.js
+
+
+1. Install dependencies:
+   `npm install`
+2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+3. Run the app:
+   `npm run dev`
