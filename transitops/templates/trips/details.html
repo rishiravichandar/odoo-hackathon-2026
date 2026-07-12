@@ -1,0 +1,333 @@
+{% extends 'base.html' %}
+
+{% block title %}Trip Details (TRIP-{{ trip.id }}) - TransitOps{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb mb-1">
+      <li class="breadcrumb-item"><a href="/" class="text-decoration-none">Dashboard</a></li>
+      <li class="breadcrumb-item"><a href="/trips" class="text-decoration-none">Trips</a></li>
+      <li class="breadcrumb-item active" aria-current="page">TRIP-{{ trip.id }}</li>
+    </ol>
+  </nav>
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div>
+      <h2 class="fw-bold text-dark m-0 d-flex align-items-center gap-2">
+        <span>Trip ID: TRIP-{{ trip.id }}</span>
+        {% if trip.status == 'Draft' or trip.status == 'Scheduled' %}
+          <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 rounded-pill fs-6 fw-semibold px-3">Draft</span>
+        {% elif trip.status == 'Dispatched' or trip.status == 'In Progress' %}
+          <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill fs-6 fw-semibold px-3">Dispatched</span>
+        {% elif trip.status == 'Completed' %}
+          <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill fs-6 fw-semibold px-3">Completed</span>
+        {% else %}
+          <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 rounded-pill fs-6 fw-semibold px-3">Cancelled</span>
+        {% endif %}
+      </h2>
+      <p class="text-secondary small m-0 mt-1">Route: <strong>{{ trip.source }}</strong> &rarr; <strong>{{ trip.destination }}</strong></p>
+    </div>
+    <div>
+      <a href="/trips" class="btn btn-outline-secondary d-flex align-items-center gap-1">
+        <i class="bi bi-arrow-left"></i> Return to Registry
+      </a>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  
+  <!-- Left Side: Route, Cargo, Timeline details -->
+  <div class="col-lg-8">
+    <div class="card border-0 shadow-sm rounded-3 mb-4">
+      <div class="card-header bg-white border-0 py-3">
+        <h5 class="fw-bold text-dark m-0"><i class="bi bi-compass text-primary me-2"></i>Route & Cargo Details</h5>
+      </div>
+      <div class="card-body p-4 pt-0">
+        <!-- Main stats -->
+        <div class="row g-3 text-center mb-4 p-3 bg-light rounded-3">
+          <div class="col-6 col-md-3 border-end border-2">
+            <span class="text-secondary small d-block mb-1">Origin Terminal</span>
+            <span class="fw-bold text-dark d-block">{{ trip.source }}</span>
+          </div>
+          <div class="col-6 col-md-3 border-end border-2">
+            <span class="text-secondary small d-block mb-1">Destination Hub</span>
+            <span class="fw-bold text-dark d-block">{{ trip.destination }}</span>
+          </div>
+          <div class="col-6 col-md-3 border-end border-2">
+            <span class="text-secondary small d-block mb-1">Estimated Distance</span>
+            <span class="fw-bold text-dark fs-5 d-block">{{ trip.planned_distance }} km</span>
+          </div>
+          <div class="col-6 col-md-3">
+            <span class="text-secondary small d-block mb-1">Trip Purpose</span>
+            <span class="fw-semibold text-secondary d-block">{{ trip.purpose or 'General Logistical' }}</span>
+          </div>
+        </div>
+
+        <!-- Cargo Capacity Math -->
+        <div class="mb-4">
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <span class="fw-semibold text-secondary small">Cargo Utilization</span>
+            <span class="small fw-bold {% if trip.cargo_weight > trip.vehicle_capacity %}text-danger{% else %}text-dark{% endif %}">
+              {{ trip.cargo_weight }} kg / {{ trip.vehicle_capacity }} kg Max Load
+            </span>
+          </div>
+          {% set cargo_util_pct = (trip.cargo_weight / trip.vehicle_capacity * 100) | round(1) %}
+          <div class="progress" style="height: 12px;">
+            <div class="progress-bar {% if cargo_util_pct > 90 %}bg-danger{% elif cargo_util_pct > 75 %}bg-warning{% else %}bg-success{% endif %}" role="progressbar" style="width: {{ cargo_util_pct }}%;" aria-valuenow="{{ cargo_util_pct }}" aria-valuemin="0" aria-valuemax="100"></div>
+          </div>
+          <div class="d-flex justify-content-between mt-1 text-secondary" style="font-size: 0.72rem;">
+            <span>Manifested: {{ trip.cargo_description or 'No Cargo Details' }}</span>
+            <span>Usage: {{ cargo_util_pct }}% of vehicle limit</span>
+          </div>
+        </div>
+
+        <!-- Notes Section -->
+        {% if trip.notes %}
+        <div class="border-start border-primary border-3 ps-3 py-1 bg-primary bg-opacity-5 rounded-end">
+          <h6 class="fw-bold text-primary small m-0 mb-1">Dispatch Directives & Route Instructions:</h6>
+          <p class="text-secondary small m-0 italic">"{{ trip.notes }}"</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Timeline & Log -->
+    <div class="card border-0 shadow-sm rounded-3">
+      <div class="card-header bg-white border-0 py-3">
+        <h5 class="fw-bold text-dark m-0"><i class="bi bi-clock-history text-success me-2"></i>Operational Timeline</h5>
+      </div>
+      <div class="card-body p-4 pt-0">
+        <div class="position-relative ps-4">
+          
+          <!-- Outer border/timeline track -->
+          <div class="position-absolute h-100 border-start border-secondary border-opacity-25" style="left: 11px; top: 10px; width: 0;"></div>
+
+          <!-- Dispatch Time -->
+          <div class="mb-4 position-relative">
+            <span class="position-absolute bg-primary rounded-circle" style="left: -29px; top: 4px; width: 14px; height: 14px; border: 3px solid white; box-shadow: 0 0 0 2px var(--bs-primary);"></span>
+            <div class="ms-1">
+              <span class="text-secondary small d-block">Planned Dispatch Date & Time</span>
+              <strong class="text-dark">{{ trip.dispatch_date }}</strong>
+              <small class="text-muted ms-2">(Local Terminal Departure)</small>
+            </div>
+          </div>
+
+          <!-- Expected Return -->
+          <div class="mb-4 position-relative">
+            <span class="position-absolute bg-info rounded-circle" style="left: -29px; top: 4px; width: 14px; height: 14px; border: 3px solid white; box-shadow: 0 0 0 2px var(--bs-info);"></span>
+            <div class="ms-1">
+              <span class="text-secondary small d-block">Expected Return Date & Time</span>
+              <strong class="text-dark">{{ trip.expected_return }}</strong>
+              <small class="text-muted ms-2">(Est. Round-Trip Window)</small>
+            </div>
+          </div>
+
+          <!-- Actual Return -->
+          <div class="position-relative">
+            {% if trip.status == 'Completed' %}
+              <span class="position-absolute bg-success rounded-circle" style="left: -29px; top: 4px; width: 14px; height: 14px; border: 3px solid white; box-shadow: 0 0 0 2px var(--bs-success);"></span>
+              <div class="ms-1">
+                <span class="text-secondary small d-block">Actual Return Recorded</span>
+                <strong class="text-success">{{ trip.actual_return }}</strong>
+                <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill small ms-2" style="font-size: 0.7rem;">Trip Finalized</span>
+              </div>
+            {% elif trip.status == 'Cancelled' %}
+              <span class="position-absolute bg-danger rounded-circle" style="left: -29px; top: 4px; width: 14px; height: 14px; border: 3px solid white; box-shadow: 0 0 0 2px var(--bs-danger);"></span>
+              <div class="ms-1">
+                <span class="text-secondary small d-block">Trip Cancelled Status</span>
+                <strong class="text-danger">Dispatch Aborted</strong>
+                <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 rounded-pill small ms-2" style="font-size: 0.7rem;">Terminated</span>
+              </div>
+            {% else %}
+              <span class="position-absolute bg-secondary bg-opacity-50 rounded-circle" style="left: -29px; top: 4px; width: 14px; height: 14px; border: 3px solid white;"></span>
+              <div class="ms-1">
+                <span class="text-secondary small d-block">Actual Return Date & Time</span>
+                <strong class="text-secondary font-monospace italic">Pending Transit Completion...</strong>
+              </div>
+            {% endif %}
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Side: Assigned Assets & Operations Actions -->
+  <div class="col-lg-4">
+    
+    <!-- Dispatch Action Center -->
+    <div class="card border-0 shadow-sm rounded-3 mb-4 bg-dark text-white">
+      <div class="card-header bg-dark border-0 py-3">
+        <h5 class="fw-bold m-0"><i class="bi bi-cpu me-2 text-warning"></i>Operations Action Center</h5>
+      </div>
+      <div class="card-body p-4 pt-0">
+        
+        {% if trip.status == 'Draft' %}
+          <p class="small text-gray-400">This trip is currently in a draft state. Driver and vehicle assets are assigned but remain Available until the dispatch is initiated.</p>
+          <div class="d-grid gap-2 mt-3">
+            <form action="/trips/start/{{ trip.id }}" method="POST" onsubmit="return confirm('Confirm Trip Dispatch? This will change Vehicle and Driver status to \'On Trip\'.')">
+              <button type="submit" class="btn btn-warning w-full d-flex align-items-center justify-content-center gap-2 py-2 fw-semibold" id="btn-start-trip">
+                <i class="bi bi-lightning-fill"></i> Dispatch & Start Trip
+              </button>
+            </form>
+            {% if session.get('user_role') == 'Fleet Manager' %}
+            <form action="/trips/cancel/{{ trip.id }}" method="POST" onsubmit="return confirm('Cancel this dispatch order? This will free assigned assets.')">
+              <button type="submit" class="btn btn-outline-danger w-full d-flex align-items-center justify-content-center gap-2 py-2 small" id="btn-cancel-trip-scheduled">
+                <i class="bi bi-x-circle"></i> Cancel Dispatch Order
+              </button>
+            </form>
+            {% endif %}
+          </div>
+
+        {% elif trip.status == 'In Progress' or trip.status == 'Dispatched' %}
+          <p class="small text-gray-400">Assets are active on the route. Fill out the actual return date/time below to finalize delivery, release assets, and update the vehicle odometer.</p>
+          
+          <div class="mb-3 d-grid">
+            {% if trip.destination and trip.destination|trim %}
+              <a href="https://www.google.com/maps/dir/?api=1&destination={{ trip.destination|urlencode }}&travelmode=driving" target="_blank" rel="noopener noreferrer" class="btn btn-outline-info d-flex align-items-center justify-content-center gap-2 py-2 fw-semibold" id="btn-navigate">
+                <i class="bi bi-geo-alt-fill text-info"></i> NAVIGATE
+              </a>
+            {% else %}
+              <button type="button" class="btn btn-outline-secondary d-flex align-items-center justify-content-center gap-2 py-2 fw-semibold" disabled id="btn-navigate-disabled">
+                <i class="bi bi-geo-alt-fill text-muted"></i> Destination unavailable.
+              </button>
+            {% endif %}
+          </div>
+          
+          <form action="/trips/complete/{{ trip.id }}" method="POST" class="mt-3">
+            <div class="mb-3">
+              <label for="actual_return" class="form-label text-light small fw-medium mb-1">Actual Return Date & Time</label>
+              <input type="datetime-local" class="form-control bg-secondary text-white border-secondary" id="form-actual-return" name="actual_return">
+              <small class="text-gray-400" style="font-size: 0.72rem;">Leave blank to record current date and time automatically</small>
+            </div>
+            
+            <div class="d-grid gap-2">
+              <button type="submit" class="btn btn-success d-flex align-items-center justify-content-center gap-2 py-2 fw-semibold" id="btn-complete-trip">
+                <i class="bi bi-check-circle-fill"></i> Record Arrival & Complete
+              </button>
+            </div>
+          </form>
+          
+          {% if session.get('user_role') == 'Fleet Manager' %}
+          <div class="border-top border-secondary my-3"></div>
+          
+          <form action="/trips/cancel/{{ trip.id }}" method="POST" onsubmit="return confirm('Force Cancel this active dispatch? Highly discouraged while on transit. This will instantly release assets to Available.')">
+            <div class="d-grid">
+              <button type="submit" class="btn btn-outline-danger btn-sm d-flex align-items-center justify-content-center gap-1 py-1.5" id="btn-cancel-trip-active">
+                <i class="bi bi-exclamation-triangle"></i> Cancel Active Trip
+              </button>
+            </div>
+          </form>
+          {% endif %}
+
+        {% elif trip.status == 'Completed' %}
+          <div class="text-center py-3">
+            <i class="bi bi-check-circle-fill fs-1 text-success mb-2"></i>
+            <h6 class="fw-bold m-0 text-white">Trip Finished Successfully</h6>
+            <p class="small text-gray-400 mt-2 mb-0">Vehicle and Driver have arrived safely at the terminal. All transit statistics are logged and assets have been made Available for future dispatches.</p>
+          </div>
+
+        {% else %}
+          <div class="text-center py-3">
+            <i class="bi bi-x-circle-fill fs-1 text-danger mb-2"></i>
+            <h6 class="fw-bold m-0 text-white">Dispatch Cancelled</h6>
+            <p class="small text-gray-400 mt-2 mb-0">This dispatch was cancelled. Drivers and vehicles are released back into the available fleet pool.</p>
+          </div>
+        {% endif %}
+
+      </div>
+    </div>
+
+    <!-- Assigned Vehicle Details -->
+    <div class="card border-0 shadow-sm rounded-3 mb-4">
+      <div class="card-header bg-white border-0 py-3 pb-0">
+        <h6 class="fw-bold text-dark m-0 small text-uppercase" style="letter-spacing: 0.05em;"><i class="bi bi-truck text-secondary me-2"></i>Assigned Vehicle</h6>
+      </div>
+      <div class="card-body p-4">
+        <div class="d-flex align-items-center mb-3">
+          <div class="bg-primary bg-opacity-10 p-2.5 rounded-3 text-primary me-3">
+            <i class="bi bi-car-front fs-4"></i>
+          </div>
+          <div>
+            <h5 class="fw-bold text-dark m-0">{{ trip.vehicle_reg }}</h5>
+            <small class="text-muted d-block">{{ trip.vehicle_name }} ({{ trip.vehicle_type }})</small>
+          </div>
+        </div>
+        <div class="row g-2 border-top border-light pt-3">
+          <div class="col-6">
+            <small class="text-secondary d-block">Max Load Capacity</small>
+            <strong class="text-dark small">{{ trip.vehicle_capacity }} kg</strong>
+          </div>
+          <div class="col-6">
+            <small class="text-secondary d-block">Last Odometer</small>
+            <strong class="text-dark small">{{ trip.vehicle_odometer }} km</strong>
+          </div>
+          <div class="col-6 mt-2">
+            <small class="text-secondary d-block">Asset Region</small>
+            <strong class="text-dark small">{{ trip.vehicle_region }}</strong>
+          </div>
+          <div class="col-6 mt-2">
+            <small class="text-secondary d-block">Asset Status</small>
+            {% if trip.vehicle_status == 'Available' %}
+              <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill small" style="font-size: 0.7rem;">Available</span>
+            {% elif trip.vehicle_status == 'On Trip' %}
+              <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill small" style="font-size: 0.7rem;">On Trip</span>
+            {% else %}
+              <span class="badge bg-warning-subtle text-warning border border-warning-subtle rounded-pill small" style="font-size: 0.7rem;">{{ trip.vehicle_status }}</span>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Assigned Driver Details -->
+    <div class="card border-0 shadow-sm rounded-3">
+      <div class="card-header bg-white border-0 py-3 pb-0">
+        <h6 class="fw-bold text-dark m-0 small text-uppercase" style="letter-spacing: 0.05em;"><i class="bi bi-person-badge text-secondary me-2"></i>Assigned Driver</h6>
+      </div>
+      <div class="card-body p-4">
+        <div class="d-flex align-items-center mb-3">
+          <div class="bg-success bg-opacity-10 p-2.5 rounded-3 text-success me-3">
+            <i class="bi bi-person fs-4"></i>
+          </div>
+          <div>
+            <h5 class="fw-bold text-dark m-0">{{ trip.driver_name }}</h5>
+            <small class="text-muted d-block">Emp ID: {{ trip.driver_emp_id }}</small>
+          </div>
+        </div>
+        <div class="row g-2 border-top border-light pt-3">
+          <div class="col-6">
+            <small class="text-secondary d-block">Safety Score</small>
+            <strong class="text-dark small">{{ trip.driver_safety_score }}%</strong>
+          </div>
+          <div class="col-6">
+            <small class="text-secondary d-block">Phone Number</small>
+            <strong class="text-dark small">{{ trip.driver_phone or 'N/A' }}</strong>
+          </div>
+          <div class="col-12 mt-2">
+            <small class="text-secondary d-block">Driver Email</small>
+            <strong class="text-dark small">{{ trip.driver_email or 'N/A' }}</strong>
+          </div>
+          <div class="col-6 mt-2">
+            <small class="text-secondary d-block">License Status</small>
+            <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill small" style="font-size: 0.7rem;">Active</span>
+          </div>
+          <div class="col-6 mt-2">
+            <small class="text-secondary d-block">Duty Status</small>
+            {% if trip.driver_status == 'Available' %}
+              <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill small" style="font-size: 0.7rem;">Available</span>
+            {% elif trip.driver_status == 'On Trip' %}
+              <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill small" style="font-size: 0.7rem;">On Trip</span>
+            {% else %}
+              <span class="badge bg-warning-subtle text-warning border border-warning-subtle rounded-pill small" style="font-size: 0.7rem;">{{ trip.driver_status }}</span>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}

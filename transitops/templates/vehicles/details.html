@@ -1,0 +1,243 @@
+{% extends 'base.html' %}
+
+{% block title %}Vehicle Details - {{ vehicle.registration_number }} - TransitOps{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+  <a href="/vehicles" class="text-decoration-none text-secondary small d-inline-flex align-items-center gap-1 mb-2">
+    <i class="bi bi-arrow-left"></i> Back to Vehicle Registry
+  </a>
+  <div class="d-flex justify-content-between align-items-start">
+    <div>
+      <div class="d-flex align-items-center gap-3">
+        <h2 class="fw-bold text-dark m-0">{{ vehicle.registration_number }}</h2>
+        {% if vehicle.status == 'Available' %}
+          <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill">Available</span>
+        {% elif vehicle.status == 'On Trip' %}
+          <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill">On Trip</span>
+        {% elif vehicle.status == 'In Shop' %}
+          <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill">In Shop</span>
+        {% else %}
+          <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle rounded-pill">Retired</span>
+        {% endif %}
+      </div>
+      <p class="text-secondary small m-0">{{ vehicle.name }} &bull; {{ vehicle.type }}</p>
+    </div>
+    {% if session.get('user_role') in ['Fleet Manager', 'Safety Officer'] %}
+    <div class="d-inline-flex gap-2">
+      <a href="/vehicles/edit/{{ vehicle.id }}" class="btn btn-primary btn-sm px-3" id="btn-edit-details">
+        <i class="bi bi-pencil me-1"></i> Edit Asset
+      </a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Specifications Card -->
+  <div class="col-lg-4">
+    <div class="card border-0 shadow-sm rounded-3 mb-4">
+      <div class="card-header bg-white py-3 border-0">
+        <h5 class="fw-bold text-dark m-0"><i class="bi bi-info-circle me-2 text-primary"></i>Asset Properties</h5>
+      </div>
+      <div class="card-body p-0">
+        <ul class="list-group list-group-flush">
+          <li class="list-group-item d-flex justify-content-between align-items-center py-3">
+            <span class="text-secondary small fw-medium">Type</span>
+            <span class="badge bg-light text-dark border">{{ vehicle.type }}</span>
+          </li>
+          <li class="list-group-item d-flex justify-content-between align-items-center py-3">
+            <span class="text-secondary small fw-medium">Operating Region</span>
+            <span class="fw-semibold text-dark">{{ vehicle.region }}</span>
+          </li>
+          <li class="list-group-item d-flex justify-content-between align-items-center py-3">
+            <span class="text-secondary small fw-medium">Max Load Capacity</span>
+            <span class="fw-semibold text-dark">{{ "{:,.0f}".format(vehicle.max_load_capacity) }} kg</span>
+          </li>
+          <li class="list-group-item d-flex justify-content-between align-items-center py-3">
+            <span class="text-secondary small fw-medium">Odometer</span>
+            <span class="fw-semibold text-dark">{{ "{:,.1f}".format(vehicle.odometer) }} km</span>
+          </li>
+          <li class="list-group-item d-flex justify-content-between align-items-center py-3">
+            <span class="text-secondary small fw-medium">Acquisition Cost</span>
+            <span class="fw-semibold text-dark">₹{{ "{:,.2f}".format(vehicle.acquisition_cost) }}</span>
+          </li>
+          <li class="list-group-item d-flex justify-content-between align-items-center py-3">
+            <span class="text-secondary small fw-medium">Total Expenses Tracked</span>
+            <span class="fw-bold text-danger">₹{{ "{:,.2f}".format(total_expenses) }}</span>
+          </li>
+          <li class="list-group-item d-flex justify-content-between align-items-center py-3">
+            <span class="text-secondary small fw-medium">Vehicle ROI</span>
+            <span class="fw-bold {% if roi < 0 %}text-danger{% else %}text-success{% endif %}">{{ roi_percent }}</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Quick Stats Card -->
+    <div class="card border-0 shadow-sm rounded-3 bg-dark text-white p-3">
+      <h6 class="text-secondary text-gray-400 small fw-semibold"><i class="bi bi-calculator me-1"></i>Operational Math</h6>
+      <div class="row g-2 mt-2">
+        <div class="col-6">
+          <div class="p-2 bg-secondary bg-opacity-25 rounded text-center">
+            <span class="text-muted d-block text-gray-400" style="font-size: 0.65rem;">Maintenance Cost</span>
+            <span class="fw-bold" style="font-size: 0.9rem;">₹{{ "{:,.2f}".format(maintenance_cost) }}</span>
+          </div>
+        </div>
+        <div class="col-6">
+          <div class="p-2 bg-secondary bg-opacity-25 rounded text-center">
+            <span class="text-muted d-block text-gray-400" style="font-size: 0.65rem;">Fuel Expenditures</span>
+            <span class="fw-bold" style="font-size: 0.9rem;">₹{{ "{:,.2f}".format(fuel_cost) }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dynamic Logs & Histories -->
+  <div class="col-lg-8">
+    <div class="card border-0 shadow-sm rounded-3">
+      <div class="card-header bg-white py-2 border-bottom">
+        <ul class="nav nav-tabs card-header-tabs border-bottom-0" id="vehicleTabs" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active fw-bold text-secondary" id="trips-tab" data-bs-toggle="tab" data-bs-target="#trips" type="button" role="tab" aria-controls="trips" aria-selected="true" style="font-size: 0.85rem;">
+              <i class="bi bi-geo-alt me-1"></i> Trips History ({{ trips|length }})
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link fw-bold text-secondary" id="maintenance-tab" data-bs-toggle="tab" data-bs-target="#maintenance" type="button" role="tab" aria-controls="maintenance" aria-selected="false" style="font-size: 0.85rem;">
+              <i class="bi bi-wrench-adjustable me-1"></i> Maintenance Logs ({{ maintenance|length }})
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link fw-bold text-secondary" id="fuel-tab" data-bs-toggle="tab" data-bs-target="#fuel" type="button" role="tab" aria-controls="fuel" aria-selected="false" style="font-size: 0.85rem;">
+              <i class="bi bi-fuel-pump me-1"></i> Fuel Logs ({{ fuel|length }})
+            </button>
+          </li>
+        </ul>
+      </div>
+
+      <div class="tab-content" id="vehicleTabsContent">
+        <!-- 1. Trips Tab -->
+        <div class="tab-pane fade show active p-0" id="trips" role="tabpanel" aria-labelledby="trips-tab">
+          <div class="table-responsive">
+            <table class="table table-hover align-middle m-0" id="table-details-trips">
+              <thead class="table-light">
+                <tr>
+                  <th class="ps-4">Route</th>
+                  <th>Driver</th>
+                  <th class="text-end">Cargo</th>
+                  <th class="text-end">Distance</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for t in trips %}
+                <tr>
+                  <td class="ps-4 fw-semibold text-dark">{{ t.source }} &rarr; {{ t.destination }}</td>
+                  <td>{{ t.driver_name }}</td>
+                  <td class="text-end text-secondary small">{{ t.cargo_weight }} kg</td>
+                  <td class="text-end text-secondary small">{{ t.planned_distance }} km</td>
+                  <td>
+                    {% if t.status == 'Draft' %}
+                      <span class="badge bg-warning text-dark">Draft</span>
+                    {% elif t.status == 'Dispatched' %}
+                      <span class="badge bg-primary">Dispatched</span>
+                    {% elif t.status == 'Completed' %}
+                      <span class="badge bg-success">Completed</span>
+                    {% else %}
+                      <span class="badge bg-danger">Cancelled</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% else %}
+                <tr>
+                  <td colspan="5" class="text-center py-5 text-muted">
+                    <i class="bi bi-geo-alt fs-2 d-block mb-2 text-secondary"></i>
+                    No dispatch trips logged for this vehicle asset.
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 2. Maintenance Tab -->
+        <div class="tab-pane fade p-0" id="maintenance" role="tabpanel" aria-labelledby="maintenance-tab">
+          <div class="table-responsive">
+            <table class="table table-hover align-middle m-0" id="table-details-maintenance">
+              <thead class="table-light">
+                <tr>
+                  <th class="ps-4">Description</th>
+                  <th class="text-end">Cost</th>
+                  <th>Start Date</th>
+                  <th>End Date</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for m in maintenance %}
+                <tr>
+                  <td class="ps-4 fw-semibold text-dark">{{ m.description }}</td>
+                  <td class="text-end text-danger fw-semibold">₹{{ "{:,.2f}".format(m.cost) }}</td>
+                  <td>{{ m.start_date }}</td>
+                  <td>{{ m.end_date or '--' }}</td>
+                  <td>
+                    {% if m.status == 'Active' %}
+                      <span class="badge bg-danger">Active (In Shop)</span>
+                    {% else %}
+                      <span class="badge bg-success">Closed</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% else %}
+                <tr>
+                  <td colspan="5" class="text-center py-5 text-muted">
+                    <i class="bi bi-wrench-adjustable fs-2 d-block mb-2 text-secondary"></i>
+                    No maintenance records found for this vehicle.
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 3. Fuel Tab -->
+        <div class="tab-pane fade p-0" id="fuel" role="tabpanel" aria-labelledby="fuel-tab">
+          <div class="table-responsive">
+            <table class="table table-hover align-middle m-0" id="table-details-fuel">
+              <thead class="table-light">
+                <tr>
+                  <th class="ps-4">Refuel Date</th>
+                  <th class="text-end">Liters</th>
+                  <th class="text-end">Cost</th>
+                  <th class="text-end">Price / Liter</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for f in fuel %}
+                <tr>
+                  <td class="ps-4 fw-semibold text-dark">{{ f.date }}</td>
+                  <td class="text-end text-secondary">{{ "{:,.1f}".format(f.liters) }} L</td>
+                  <td class="text-end text-dark fw-medium">₹{{ "{:,.2f}".format(f.cost) }}</td>
+                  <td class="text-end text-muted small">₹{{ "{:,.2f}".format(f.cost / f.liters if f.liters > 0 else 0) }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                  <td colspan="4" class="text-center py-5 text-muted">
+                    <i class="bi bi-fuel-pump fs-2 d-block mb-2 text-secondary"></i>
+                    No fuel logs recorded for this vehicle.
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

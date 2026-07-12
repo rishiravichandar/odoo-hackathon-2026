@@ -1,0 +1,262 @@
+{% extends 'base.html' %}
+
+{% block title %}Driver Profile Details - TransitOps{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="/drivers" class="text-decoration-none">Drivers</a></li>
+      <li class="breadcrumb-item active" aria-current="page">{{ driver.name }}</li>
+    </ol>
+  </nav>
+  <div class="d-flex justify-content-between align-items-center">
+    <div>
+      <h2 class="fw-bold text-dark m-0">{{ driver.name }}</h2>
+      <p class="text-secondary small m-0">Detailed credentials, trip records, and vehicle assignments</p>
+    </div>
+    {% if session.get('user_role') in ['Fleet Manager', 'Safety Officer'] %}
+    <div class="d-flex gap-2">
+      <a href="/drivers/edit/{{ driver.id }}" class="btn btn-primary d-flex align-items-center gap-1" id="btn-edit-driver-profile">
+        <i class="bi bi-pencil"></i> Edit Profile
+      </a>
+      {% if driver.status != 'Suspended' %}
+      <form action="/drivers/delete/{{ driver.id }}" method="POST" onsubmit="return confirm('Suspend this driver profile? This removes vehicle assignment and sets status to Suspended.')" class="m-0" id="form-delete-detail-page">
+        <button type="submit" class="btn btn-outline-danger" id="btn-deactivate-driver">
+          <i class="bi bi-slash-circle"></i> Suspend
+        </button>
+      </form>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Left Column: Profile Card & Information -->
+  <div class="col-lg-5">
+    <!-- Main Badge Card -->
+    <div class="card border-0 shadow-sm rounded-3 mb-4">
+      <div class="card-body p-4 text-center">
+        <div class="d-inline-flex p-3 rounded-circle bg-secondary bg-opacity-10 text-secondary mb-3">
+          <i class="bi bi-person-badge-fill fs-1"></i>
+        </div>
+        <h3 class="fw-bold text-dark mb-1">{{ driver.name }}</h3>
+        <p class="text-secondary small mb-3">Employee ID: <strong class="text-dark">{{ driver.employee_id or '--' }}</strong></p>
+        
+        <div class="d-flex justify-content-center gap-2 mb-3">
+          {% if driver.status == 'Available' %}
+            <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-1.5 rounded-pill" id="detail-status-badge">Available</span>
+          {% elif driver.status == 'On Trip' %}
+            <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-1.5 rounded-pill" id="detail-status-badge">On Trip</span>
+          {% elif driver.status == 'Off Duty' %}
+            <span class="badge bg-warning-subtle text-warning border border-warning-subtle px-3 py-1.5 rounded-pill" id="detail-status-badge">Off Duty</span>
+          {% else %}
+            <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-3 py-1.5 rounded-pill" id="detail-status-badge">Suspended</span>
+          {% endif %}
+          <span class="badge bg-light text-secondary border px-3 py-1.5 rounded-pill"><i class="bi bi-geo me-1"></i>{{ driver.region }}</span>
+        </div>
+
+        <hr class="text-secondary opacity-25">
+
+        <div class="row text-start mt-3">
+          <div class="col-6 mb-3">
+            <span class="text-secondary small d-block mb-1">Safety Index</span>
+            <span class="fw-bold text-dark fs-5"><i class="bi bi-shield-check text-success me-1"></i>{{ driver.safety_score }}%</span>
+          </div>
+          <div class="col-6 mb-3">
+            <span class="text-secondary small d-block mb-1">Total Trips Logged</span>
+            <span class="fw-bold text-dark fs-5"><i class="bi bi-compass text-primary me-1"></i>{{ trip_count }}</span>
+          </div>
+          <div class="col-6">
+            <span class="text-secondary small d-block mb-1">Employment Date</span>
+            <span class="fw-semibold text-dark small">{{ driver.date_joined or 'N/A' }}</span>
+          </div>
+          <div class="col-6">
+            <span class="text-secondary small d-block mb-1">Assigned Vehicle</span>
+            <span class="fw-semibold text-dark small">
+              {% if driver.assigned_vehicle_id %}
+                <span class="text-primary"><i class="bi bi-truck me-1"></i>{{ driver.vehicle_reg }}</span>
+              {% else %}
+                <span class="text-muted">None Assigned</span>
+              {% endif %}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Personal & License Details Card -->
+    <div class="card border-0 shadow-sm rounded-3">
+      <div class="card-header bg-light border-0 p-3">
+        <h5 class="fw-bold m-0 text-dark small text-uppercase" style="letter-spacing: 0.05em;"><i class="bi bi-card-text me-2"></i>Credentials & License Specs</h5>
+      </div>
+      <div class="card-body p-4">
+        <div class="mb-3">
+          <span class="text-secondary small d-block">License Number</span>
+          <span class="fw-semibold text-dark">{{ driver.license_number }}</span>
+        </div>
+        <div class="mb-3">
+          <span class="text-secondary small d-block">License Type / Category</span>
+          <span class="badge bg-light text-dark border">{{ driver.license_category }}</span>
+        </div>
+        <div class="mb-3">
+          <span class="text-secondary small d-block">License Expiration Date</span>
+          <span class="fw-medium text-dark">{{ driver.license_expiry_date }}</span>
+        </div>
+        <div class="mb-3">
+          <span class="text-secondary small d-block">Phone Number</span>
+          <span class="fw-semibold text-dark">{{ driver.contact_number }}</span>
+        </div>
+        <div class="mb-3">
+          <span class="text-secondary small d-block">Email Address</span>
+          <span class="fw-medium text-dark">{{ driver.email or 'No email provided' }}</span>
+        </div>
+        <div class="mb-0">
+          <span class="text-secondary small d-block">Physical Address</span>
+          <span class="fw-medium text-dark small">{{ driver.address or 'No physical address configured' }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Column: Vehicle Assignment & Trip History -->
+  <div class="col-lg-7">
+    <!-- Vehicle Assignment Card -->
+    <div class="card border-0 shadow-sm rounded-3 mb-4">
+      <div class="card-header bg-dark text-white p-3 d-flex justify-content-between align-items-center">
+        <h5 class="card-title m-0 fw-semibold"><i class="bi bi-key me-2"></i>Active Vehicle Assignment</h5>
+        {% if driver.assigned_vehicle_id and driver.status != 'Suspended' %}
+        <form action="/drivers/assign-vehicle/{{ driver.id }}" method="POST" class="m-0" id="form-remove-assignment-header">
+          <input type="hidden" name="action" value="remove">
+          <button type="submit" class="btn btn-sm btn-danger px-3" id="btn-remove-vehicle-header">
+            Remove Active Assignment
+          </button>
+        </form>
+        {% endif %}
+      </div>
+      <div class="card-body p-4">
+        {% if driver.status == 'Suspended' %}
+          <div class="alert alert-secondary m-0 d-flex align-items-center gap-3">
+            <i class="bi bi-exclamation-triangle fs-4 text-secondary"></i>
+            <div>
+              <strong class="d-block">Vehicle Assignment Disabled</strong>
+              Suspended drivers cannot be assigned to vehicles. Reactivate driver status to configure assignment.
+            </div>
+          </div>
+        {% elif driver.assigned_vehicle_id %}
+          <div class="d-flex align-items-start gap-4">
+            <div class="p-3 rounded-3 bg-primary bg-opacity-10 text-primary">
+              <i class="bi bi-truck fs-1"></i>
+            </div>
+            <div class="flex-grow-1">
+              <h4 class="fw-bold text-dark mb-1">{{ driver.vehicle_reg }}</h4>
+              <p class="text-secondary small mb-2">Model: <strong>{{ driver.vehicle_name }}</strong></p>
+              
+              <div class="d-flex align-items-center gap-2 mb-3">
+                <span class="text-secondary small">Vehicle Status:</span>
+                {% if driver.vehicle_status == 'Available' %}
+                  <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill">Available</span>
+                {% elif driver.vehicle_status == 'On Trip' %}
+                  <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill">On Trip</span>
+                {% elif driver.vehicle_status == 'In Shop' %}
+                  <span class="badge bg-warning-subtle text-warning border border-warning-subtle rounded-pill">In Shop</span>
+                {% else %}
+                  <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle rounded-pill">{{ driver.vehicle_status }}</span>
+                {% endif %}
+              </div>
+              
+              <!-- Assign/Change Form inline -->
+              <form action="/drivers/assign-vehicle/{{ driver.id }}" method="POST" class="row g-2 align-items-center" id="form-change-assignment">
+                <div class="col-auto">
+                  <select class="form-select form-select-sm" name="vehicle_id" id="change-vehicle-select" required>
+                    <option value="">Change Assigned Vehicle...</option>
+                    {% for veh in available_vehicles %}
+                    <option value="{{ veh.id }}">{{ veh.registration_number }} - {{ veh.name }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="col-auto">
+                  <button type="submit" class="btn btn-outline-primary btn-sm" id="btn-change-vehicle-submit">Reassign</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        {% else %}
+          <div class="text-center py-4">
+            <i class="bi bi-shield-slash fs-1 text-muted d-block mb-2"></i>
+            <h5 class="fw-bold text-dark mb-1">No Active Vehicle Assigned</h5>
+            <p class="text-secondary small mb-4">This driver cannot be dispatched on trips until a vehicle is actively assigned.</p>
+            
+            <form action="/drivers/assign-vehicle/{{ driver.id }}" method="POST" class="d-inline-flex gap-2 align-items-center" id="form-assign-initial-vehicle">
+              <select class="form-select" name="vehicle_id" id="assign-vehicle-select" required style="width: 250px;">
+                <option value="">Select Available Vehicle...</option>
+                {% for veh in available_vehicles %}
+                <option value="{{ veh.id }}">{{ veh.registration_number }} - {{ veh.name }}</option>
+                {% endfor %}
+              </select>
+              <button type="submit" class="btn btn-primary" id="btn-assign-vehicle-submit">Assign Vehicle</button>
+            </form>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Driver Trip History -->
+    <div class="card border-0 shadow-sm rounded-3">
+      <div class="card-header bg-light border-0 p-3">
+        <h5 class="fw-bold m-0 text-dark small text-uppercase" style="letter-spacing: 0.05em;"><i class="bi bi-compass-fill me-2"></i>Driver Trip History</h5>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle m-0" id="table-driver-trips">
+            <thead class="table-light">
+              <tr>
+                <th class="ps-3">Trip ID</th>
+                <th>Route</th>
+                <th>Vehicle</th>
+                <th>Load (kg)</th>
+                <th>Distance (km)</th>
+                <th class="pe-3">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for t in trips %}
+              <tr>
+                <td class="ps-3 fw-semibold">TRIP-{{ t.id }}</td>
+                <td>
+                  <div class="fw-medium text-dark">{{ t.source }}</div>
+                  <div class="text-secondary small"><i class="bi bi-arrow-right me-1"></i>{{ t.destination }}</div>
+                </td>
+                <td>
+                  <a href="/vehicles/{{ t.vehicle_id }}" class="text-decoration-none fw-semibold">
+                    {{ t.vehicle_reg }}
+                  </a>
+                </td>
+                <td>{{ t.cargo_weight }}</td>
+                <td>{{ t.planned_distance }}</td>
+                <td class="pe-3">
+                  {% if t.status == 'Completed' %}
+                    <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill">Completed</span>
+                  {% elif t.status == 'Dispatched' %}
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill">Dispatched</span>
+                  {% else %}
+                    <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle rounded-pill">{{ t.status }}</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="6" class="text-center py-4 text-muted small">
+                  No active or past trips linked to this driver profile.
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

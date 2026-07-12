@@ -1,0 +1,105 @@
+{% extends 'base.html' %}
+
+{% block title %}Edit Vehicle - {{ vehicle.registration_number }} - TransitOps{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+  <a href="/vehicles" class="text-decoration-none text-secondary small d-inline-flex align-items-center gap-1 mb-2">
+    <i class="bi bi-arrow-left"></i> Back to Vehicle Registry
+  </a>
+  <h2 class="fw-bold text-dark m-0">Edit Vehicle Asset</h2>
+  <p class="text-secondary small m-0">Updating properties for asset: <strong class="text-primary">{{ vehicle.registration_number }}</strong></p>
+</div>
+
+<div class="row">
+  <div class="col-lg-8 col-xl-6">
+    <div class="card border-0 shadow-sm rounded-3">
+      <div class="card-header bg-dark text-white py-3">
+        <h5 class="m-0 fw-bold"><i class="bi bi-pencil-square me-2"></i>Asset Specifications</h5>
+      </div>
+      <form action="/vehicles/edit/{{ vehicle.id }}" method="POST" id="form-edit-vehicle">
+        <div class="card-body p-4">
+          <div class="row g-3">
+            <div class="col-md-12">
+              <label for="registration_number" class="form-label text-secondary small fw-semibold mb-1">Registration Number (Natural Key)</label>
+              <input type="text" class="form-control bg-light" id="registration_number" name="registration_number" value="{{ vehicle.registration_number }}" required readonly>
+              <div class="form-text text-muted" style="font-size: 0.75rem;">The unique registration natural identifier is read-only.</div>
+            </div>
+
+            <div class="col-md-12">
+              <label for="name" class="form-label text-secondary small fw-semibold mb-1">Model Name / Descriptor</label>
+              <input type="text" class="form-control" id="name" name="name" value="{{ vehicle.name }}" required>
+            </div>
+
+            <div class="col-md-6">
+              <label for="type" class="form-label text-secondary small fw-semibold mb-1">Vehicle Type</label>
+              <select class="form-select" id="type" name="type" required>
+                <option value="Van" {% if vehicle.type == 'Van' %}selected{% endif %}>Van</option>
+                <option value="Light Truck" {% if vehicle.type == 'Light Truck' %}selected{% endif %}>Light Truck</option>
+                <option value="Medium Truck" {% if vehicle.type == 'Medium Truck' %}selected{% endif %}>Medium Truck</option>
+                <option value="Heavy Truck" {% if vehicle.type == 'Heavy Truck' %}selected{% endif %}>Heavy Truck</option>
+                <option value="Sedan" {% if vehicle.type == 'Sedan' %}selected{% endif %}>Sedan</option>
+                <option value="SUV" {% if vehicle.type == 'SUV' %}selected{% endif %}>SUV</option>
+              </select>
+            </div>
+
+            <div class="col-md-6">
+              <label for="region" class="form-label text-secondary small fw-semibold mb-1">Operating Region</label>
+              <select class="form-select" id="region" name="region" required>
+                <option value="North" {% if vehicle.region == 'North' %}selected{% endif %}>North</option>
+                <option value="South" {% if vehicle.region == 'South' %}selected{% endif %}>South</option>
+                <option value="East" {% if vehicle.region == 'East' %}selected{% endif %}>East</option>
+                <option value="West" {% if vehicle.region == 'West' %}selected{% endif %}>West</option>
+                <option value="Central" {% if vehicle.region == 'Central' %}selected{% endif %}>Central</option>
+              </select>
+            </div>
+
+            <div class="col-md-6">
+              <label for="max_load_capacity" class="form-label text-secondary small fw-semibold mb-1">Max Capacity (kg)</label>
+              <input type="number" step="0.1" min="0" class="form-control" id="max_load_capacity" name="max_load_capacity" value="{{ vehicle.max_load_capacity }}" required>
+            </div>
+
+            <div class="col-md-6">
+              <label for="odometer" class="form-label text-secondary small fw-semibold mb-1">Odometer (km)</label>
+              <input type="number" step="0.1" min="0" class="form-control" id="odometer" name="odometer" value="{{ vehicle.odometer }}" required>
+            </div>
+
+            <div class="col-md-6">
+              <label for="acquisition_cost" class="form-label text-secondary small fw-semibold mb-1">Acquisition Cost ($)</label>
+              <input type="number" step="0.01" min="0" class="form-control" id="acquisition_cost" name="acquisition_cost" value="{{ vehicle.acquisition_cost }}" required>
+            </div>
+
+            <div class="col-md-6">
+              <label for="status" class="form-label text-secondary small fw-semibold mb-1">Operating Status</label>
+              <select class="form-select" id="status" name="status" required>
+                <option value="Available" {% if vehicle.status == 'Available' %}selected{% endif %}>Available</option>
+                <option value="On Trip" {% if vehicle.status == 'On Trip' %}selected{% endif %}>On Trip</option>
+                <option value="In Shop" {% if vehicle.status == 'In Shop' %}selected{% endif %}>In Shop</option>
+                <option value="Retired" {% if vehicle.status == 'Retired' %}selected{% endif %}>Retired</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="card-footer bg-light p-3 d-flex justify-content-between">
+          <a href="/vehicles" class="btn btn-outline-secondary" id="btn-cancel-edit">Cancel</a>
+          <button type="submit" class="btn btn-primary" id="btn-save-edit">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card border-0 shadow-sm rounded-3 mb-4 bg-light">
+      <div class="card-body">
+        <h6 class="fw-bold text-dark mb-2"><i class="bi bi-info-circle me-1 text-primary"></i>Guidelines for Editing</h6>
+        <p class="text-secondary small mb-3">Please keep the following operations limits in mind:</p>
+        <ul class="text-secondary small ps-3 mb-0">
+          <li class="mb-2"><strong>Load capacity and odometer</strong> values must be greater than or equal to 0.</li>
+          <li class="mb-2">Changing a vehicle status to <strong>In Shop</strong> or <strong>Retired</strong> will automatically remove it from active dispatcher selection pools.</li>
+          <li>For security audits, the natural registration key cannot be renamed here to preserve relational integrity.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

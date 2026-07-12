@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+
+{% block title %}Login - TransitOps{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center align-items-center flex-grow-1" style="min-height: calc(100vh - 120px);">
+  <div class="col-md-5 col-lg-4">
+    <div class="card shadow-sm border-0 rounded-3">
+      <div class="card-body p-4 p-md-5">
+        <div class="text-center mb-4">
+          <div class="d-inline-flex mb-2" style="width: 120px; height: 120px;">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="100%" height="100%">
+              <!-- Outer circle with light gray background -->
+              <circle cx="250" cy="250" r="230" fill="#e2e8f0" />
+              
+              <!-- Inner white circle -->
+              <circle cx="250" cy="250" r="160" fill="#ffffff" />
+              
+              <!-- Paths for curved text -->
+              <path id="top-text-path" d="M 55,250 A 195,195 0 0,1 445,250" fill="none" stroke="none" />
+              <path id="bottom-text-path" d="M 445,250 A 195,195 0 0,1 55,250" fill="none" stroke="none" />
+              
+              <!-- Top curved text: 'TransitOps' -->
+              <text font-family="system-ui, -apple-system, sans-serif" font-weight="800" font-size="44" fill="#1e293b" letter-spacing="1">
+                <textPath href="#top-text-path" startOffset="50%" text-anchor="middle">TransitOps</textPath>
+              </text>
+              
+              <!-- Bottom curved text: 'SMART TRANSPORT OPERATIONS PLATFORM' -->
+              <text font-family="system-ui, -apple-system, sans-serif" font-weight="600" font-size="14.5" fill="#475569" letter-spacing="3.5">
+                <textPath href="#bottom-text-path" startOffset="50%" text-anchor="middle">SMART TRANSPORT OPERATIONS PLATFORM</textPath>
+              </text>
+              
+              <!-- Separator dots on left and right -->
+              <circle cx="62" cy="250" r="8" fill="#1e293b" />
+              <circle cx="438" cy="250" r="8" fill="#1e293b" />
+              
+              <!-- Tractor-Trailer Truck Silhouette centered -->
+              <g transform="translate(13, 0)">
+                <!-- Trailer -->
+                <rect x="200" y="222" width="145" height="44" rx="2" fill="#1e293b" />
+                <!-- Connector pin -->
+                <rect x="185" y="254" width="20" height="6" fill="#475569" />
+                <!-- Cab body -->
+                <path d="M 190,225 L 165,225 C 163,225 161,226 160,228 L 150,238 C 149,239 148,240 146,240 L 138,240 C 136,240 135,241 135,243 L 135,260 C 135,262 137,264 139,264 L 190,264 Z" fill="#1e293b" />
+                <!-- Front bumper -->
+                <rect x="131" y="258" width="5" height="5" rx="1" fill="#475569" />
+                <!-- Fuel tank -->
+                <rect x="160" y="260" width="20" height="6" rx="2" fill="#475569" />
+                <!-- Landing gear -->
+                <rect x="215" y="264" width="4" height="8" fill="#475569" />
+                
+                <!-- Tractor Front Wheel -->
+                <circle cx="148" cy="267" r="9" fill="#0f172a" />
+                <circle cx="148" cy="267" r="3" fill="#ffffff" />
+                <!-- Tractor Rear Wheels (Tandem) -->
+                <circle cx="174" cy="267" r="9" fill="#0f172a" />
+                <circle cx="174" cy="267" r="3" fill="#ffffff" />
+                <circle cx="188" cy="267" r="9" fill="#0f172a" />
+                <circle cx="188" cy="267" r="3" fill="#ffffff" />
+                <!-- Trailer Wheels (Tandem) -->
+                <circle cx="295" cy="267" r="9" fill="#0f172a" />
+                <circle cx="295" cy="267" r="3" fill="#ffffff" />
+                <circle cx="310" cy="267" r="9" fill="#0f172a" />
+                <circle cx="310" cy="267" r="3" fill="#ffffff" />
+              </g>
+            </svg>
+          </div>
+        </div>
+
+        <form action="/login" method="POST" id="form-login">
+          <div class="mb-3">
+            <label for="email" class="form-label text-secondary small fw-semibold">Email Address</label>
+            <div class="input-group">
+              <span class="input-group-text bg-light border-end-0 text-secondary"><i class="bi bi-envelope"></i></span>
+              <input type="email" class="form-control bg-light border-start-0 ps-0" id="email" name="email" placeholder="" required>
+            </div>
+          </div>
+          
+          <div class="mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <label for="password" class="form-label text-secondary small fw-semibold m-0">Password</label>
+            </div>
+            <div class="input-group">
+              <span class="input-group-text bg-light border-end-0 text-secondary"><i class="bi bi-lock"></i></span>
+              <input type="password" class="form-control bg-light border-start-0 ps-0" id="password" name="password" placeholder="" required>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary w-full py-2.5 fw-bold w-100 mb-3" id="btn-login-submit">
+            Sign In
+          </button>
+        </form>
+
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

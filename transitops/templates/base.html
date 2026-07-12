@@ -1,0 +1,668 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}TransitOps{% endblock %}</title>
+    <script>
+      (function() {
+        const theme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-bs-theme', theme);
+      })();
+    </script>
+    <!-- Bootstrap 5.3 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+      body {
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        background-color: #f8f9fa;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+      .sidebar {
+        min-width: 250px;
+        max-width: 250px;
+        background-color: #1a252f;
+        color: #ecf0f1;
+        transition: all 0.3s;
+      }
+      .sidebar .nav-link {
+        color: #b8c7ce;
+        padding: 0.8rem 1.5rem;
+        font-weight: 500;
+        border-left: 4px solid transparent;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .sidebar .nav-link:hover {
+        background-color: #2c3e50;
+        color: #ffffff;
+        border-left: 4px solid #3498db;
+      }
+      .sidebar .nav-link.active {
+        background-color: #34495e;
+        color: #ffffff;
+        border-left: 4px solid #1abc9c;
+      }
+      .main-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+      }
+      .navbar-custom {
+        background-color: #ffffff;
+        box-shadow: 0 2px 4px rgba(0,0,0,.04);
+      }
+      .card-stat {
+        border: none;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0,0,0,.02);
+        transition: transform 0.2s, box-shadow 0.2s;
+      }
+      .card-stat:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 12px rgba(0,0,0,.05);
+      }
+      .role-badge {
+        font-size: 0.75rem;
+        padding: 0.25em 0.6em;
+        border-radius: 50rem;
+      }
+      .role-Fleet-Manager { background-color: #e8f8f5; color: #117a65; }
+      .role-Driver { background-color: #eaf2f8; color: #2471a3; }
+      .role-Safety-Officer { background-color: #fef9e7; color: #b7950b; }
+      .role-Financial-Analyst { background-color: #f4ecf7; color: #6c3483; }
+
+      /* --- Premium Dark Mode Overrides --- */
+      html[data-bs-theme="dark"] body {
+        background-color: #0f172a !important; /* Elegant slate-900 background */
+        color: #f1f5f9 !important;
+      }
+      html[data-bs-theme="dark"] .navbar-custom {
+        background-color: #1e293b !important; /* Elegant slate-800 */
+        border-bottom: 1px solid #334155 !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1) !important;
+      }
+      html[data-bs-theme="dark"] .navbar-custom .text-dark {
+        color: #f1f5f9 !important;
+      }
+      html[data-bs-theme="dark"] .navbar-custom .text-muted {
+        color: #94a3b8 !important;
+      }
+      html[data-bs-theme="dark"] .card, 
+      html[data-bs-theme="dark"] .card-stat {
+        background-color: #1e293b !important;
+        border: 1px solid #334155 !important;
+        color: #f1f5f9 !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+      }
+      html[data-bs-theme="dark"] .card-header {
+        background-color: #1e293b !important;
+        border-bottom: 1px solid #334155 !important;
+        color: #f1f5f9 !important;
+      }
+      html[data-bs-theme="dark"] .table {
+        color: #f1f5f9 !important;
+      }
+      html[data-bs-theme="dark"] .table th {
+        background-color: #1e293b !important;
+        border-color: #334155 !important;
+        color: #f1f5f9 !important;
+      }
+      html[data-bs-theme="dark"] .table td {
+        background-color: transparent !important;
+        border-color: #334155 !important;
+        color: #e2e8f0 !important;
+      }
+      html[data-bs-theme="dark"] .table-striped tbody tr:nth-of-type(odd) {
+        background-color: rgba(255, 255, 255, 0.02) !important;
+      }
+      html[data-bs-theme="dark"] .form-control,
+      html[data-bs-theme="dark"] .form-select {
+        background-color: #0f172a !important;
+        border-color: #334155 !important;
+        color: #f1f5f9 !important;
+      }
+      html[data-bs-theme="dark"] .form-control:focus,
+      html[data-bs-theme="dark"] .form-select:focus {
+        background-color: #0f172a !important;
+        border-color: #3b82f6 !important;
+        color: #f1f5f9 !important;
+        box-shadow: 0 0 0 0.25rem rgba(59, 130, 246, 0.25) !important;
+      }
+      html[data-bs-theme="dark"] .form-control::placeholder {
+        color: #64748b !important;
+      }
+      html[data-bs-theme="dark"] .input-group-text {
+        background-color: #334155 !important;
+        border-color: #334155 !important;
+        color: #f1f5f9 !important;
+      }
+      html[data-bs-theme="dark"] .modal-content {
+        background-color: #1e293b !important;
+        color: #f1f5f9 !important;
+        border: 1px solid #334155 !important;
+      }
+      html[data-bs-theme="dark"] .modal-header {
+        border-bottom: 1px solid #334155 !important;
+      }
+      html[data-bs-theme="dark"] .modal-footer {
+        border-top: 1px solid #334155 !important;
+        background-color: #0f172a !important;
+      }
+      html[data-bs-theme="dark"] .btn-close {
+        filter: invert(1) grayscale(100%) brightness(200%);
+      }
+      html[data-bs-theme="dark"] .dropdown-menu {
+        background-color: #1e293b !important;
+        border-color: #334155 !important;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3) !important;
+      }
+      html[data-bs-theme="dark"] .dropdown-item {
+        color: #e2e8f0 !important;
+      }
+      html[data-bs-theme="dark"] .dropdown-item:hover {
+        background-color: #334155 !important;
+        color: #ffffff !important;
+      }
+      html[data-bs-theme="dark"] .dropdown-divider {
+        border-color: #334155 !important;
+      }
+      html[data-bs-theme="dark"] .text-dark {
+        color: #ffffff !important;
+      }
+      html[data-bs-theme="dark"] .text-secondary {
+        color: #94a3b8 !important;
+      }
+      html[data-bs-theme="dark"] .bg-light {
+        background-color: #1e293b !important;
+      }
+      html[data-bs-theme="dark"] .border {
+        border-color: #334155 !important;
+      }
+      html[data-bs-theme="dark"] .list-group-item {
+        background-color: #1e293b !important;
+        border-color: #334155 !important;
+        color: #f1f5f9 !important;
+      }
+      html[data-bs-theme="dark"] .list-group-item-action:hover {
+        background-color: #334155 !important;
+        color: #ffffff !important;
+      }
+      html[data-bs-theme="dark"] .role-Fleet-Manager { background-color: rgba(17, 122, 101, 0.25) !important; color: #1abc9c !important; }
+      html[data-bs-theme="dark"] .role-Driver { background-color: rgba(36, 113, 163, 0.25) !important; color: #3498db !important; }
+      html[data-bs-theme="dark"] .role-Safety-Officer { background-color: rgba(183, 149, 11, 0.25) !important; color: #f1c40f !important; }
+      html[data-bs-theme="dark"] .role-Financial-Analyst { background-color: rgba(108, 52, 131, 0.25) !important; color: #9b59b6 !important; }
+      html[data-bs-theme="dark"] .leaflet-tile-container {
+        filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+      }
+      html[data-bs-theme="dark"] .leaflet-container {
+        background: #0f172a !important;
+      }
+    </style>
+    {% block extra_css %}{% endblock %}
+  </head>
+  <body>
+    <div class="d-flex flex-grow-1">
+      <!-- Sidebar -->
+      {% if session.get('user_id') %}
+      <nav class="sidebar d-flex flex-column" id="sidebar-nav">
+        <div class="p-4 text-center border-bottom border-secondary">
+          <a href="/" class="text-decoration-none text-white hover-opacity-80" id="logo-redirect-link">
+            <h4 class="m-0 fw-bold text-white tracking-tight d-flex align-items-center justify-content-center gap-2">
+              <div style="width: 32px; height: 32px; flex-shrink: 0;">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="100%" height="100%">
+                  <!-- Outer circle with light gray background -->
+                  <circle cx="250" cy="250" r="230" fill="#cbd5e1" />
+                  
+                  <!-- Inner white circle -->
+                  <circle cx="250" cy="250" r="160" fill="#ffffff" />
+                  
+                  <!-- Separator dots on left and right -->
+                  <circle cx="62" cy="250" r="12" fill="#1e293b" />
+                  <circle cx="438" cy="250" r="12" fill="#1e293b" />
+                  
+                  <!-- Tractor-Trailer Truck Silhouette centered -->
+                  <g transform="translate(13, 0)">
+                    <!-- Trailer -->
+                    <rect x="200" y="222" width="145" height="44" rx="2" fill="#1e293b" />
+                    <!-- Connector pin -->
+                    <rect x="185" y="254" width="20" height="6" fill="#475569" />
+                    <!-- Cab body -->
+                    <path d="M 190,225 L 165,225 C 163,225 161,226 160,228 L 150,238 C 149,239 148,240 146,240 L 138,240 C 136,240 135,241 135,243 L 135,260 C 135,262 137,264 139,264 L 190,264 Z" fill="#1e293b" />
+                    <!-- Front bumper -->
+                    <rect x="131" y="258" width="5" height="5" rx="1" fill="#475569" />
+                    <!-- Fuel tank -->
+                    <rect x="160" y="260" width="20" height="6" rx="2" fill="#475569" />
+                    <!-- Landing gear -->
+                    <rect x="215" y="264" width="4" height="8" fill="#475569" />
+                    
+                    <!-- Tractor Front Wheel -->
+                    <circle cx="148" cy="267" r="9" fill="#0f172a" />
+                    <circle cx="148" cy="267" r="3" fill="#ffffff" />
+                    <!-- Tractor Rear Wheels (Tandem) -->
+                    <circle cx="174" cy="267" r="9" fill="#0f172a" />
+                    <circle cx="174" cy="267" r="3" fill="#ffffff" />
+                    <circle cx="188" cy="267" r="9" fill="#0f172a" />
+                    <circle cx="188" cy="267" r="3" fill="#ffffff" />
+                    <!-- Trailer Wheels (Tandem) -->
+                    <circle cx="295" cy="267" r="9" fill="#0f172a" />
+                    <circle cx="295" cy="267" r="3" fill="#ffffff" />
+                    <circle cx="310" cy="267" r="9" fill="#0f172a" />
+                    <circle cx="310" cy="267" r="3" fill="#ffffff" />
+                  </g>
+                </svg>
+              </div>
+              TransitOps
+            </h4>
+          </a>
+          <span class="badge mt-2 role-badge role-{{ session.get('user_role') | replace(' ', '-') }}">
+            {{ session.get('user_role') }}
+          </span>
+        </div>
+        <ul class="nav nav-pills flex-column mb-auto py-3">
+          <li class="nav-item">
+            <a href="/" class="nav-link {% if active_page == 'dashboard' %}active{% endif %}" id="nav-dashboard">
+              <i class="bi bi-speedometer2"></i> Dashboard
+            </a>
+          </li>
+          {% if session.get('user_role') in ['Fleet Manager', 'Safety Officer', 'Driver'] %}
+          <li class="nav-item">
+            <a href="/vehicles" class="nav-link {% if active_page == 'vehicles' %}active{% endif %}" id="nav-vehicles">
+              <i class="bi bi-car-front"></i> {% if session.get('user_role') == 'Driver' %}My Vehicle{% else %}Vehicles{% endif %}
+            </a>
+          </li>
+          {% endif %}
+          {% if session.get('user_role') in ['Fleet Manager', 'Safety Officer', 'Driver'] %}
+          <li class="nav-item">
+            <a href="/drivers" class="nav-link {% if active_page == 'drivers' %}active{% endif %}" id="nav-drivers">
+              <i class="bi bi-person-badge"></i> {% if session.get('user_role') == 'Driver' %}My Profile{% else %}Drivers{% endif %}
+            </a>
+          </li>
+          {% endif %}
+          {% if session.get('user_role') in ['Fleet Manager', 'Driver'] %}
+          <li class="nav-item">
+            <a href="/trips" class="nav-link {% if active_page == 'trips' %}active{% endif %}" id="nav-trips">
+              <i class="bi bi-geo-alt"></i> {% if session.get('user_role') == 'Driver' %}My Trips{% else %}Trips{% endif %}
+            </a>
+          </li>
+          {% endif %}
+          {% if session.get('user_role') in ['Fleet Manager', 'Safety Officer'] %}
+          <li class="nav-item">
+            <a href="/maintenance" class="nav-link {% if active_page == 'maintenance' %}active{% endif %}" id="nav-maintenance">
+              <i class="bi bi-wrench-adjustable"></i> Maintenance
+            </a>
+          </li>
+          {% endif %}
+          {% if session.get('user_role') in ['Fleet Manager', 'Financial Analyst'] %}
+          <li class="nav-item">
+            <a href="/fuel" class="nav-link {% if active_page == 'fuel' %}active{% endif %}" id="nav-fuel">
+              <i class="bi bi-fuel-pump"></i> Fuel
+            </a>
+          </li>
+          {% endif %}
+          {% if session.get('user_role') in ['Fleet Manager', 'Financial Analyst'] %}
+          <li class="nav-item">
+            <a href="/expenses" class="nav-link {% if active_page == 'expenses' %}active{% endif %}" id="nav-expenses">
+              <i class="bi bi-cash-stack"></i> Expenses
+            </a>
+          </li>
+          {% endif %}
+          {% if session.get('user_role') in ['Fleet Manager', 'Financial Analyst', 'Safety Officer'] %}
+          <li class="nav-item">
+            <a href="/reports" class="nav-link {% if active_page == 'reports' %}active{% endif %}" id="nav-reports">
+              <i class="bi bi-graph-up-arrow"></i> Reports
+            </a>
+          </li>
+          {% endif %}
+          {% if session.get('user_role') == 'Fleet Manager' %}
+          <li class="nav-item">
+            <a href="/tracking" class="nav-link {% if active_page == 'tracking' %}active{% endif %}" id="nav-tracking">
+              <i class="bi bi-geo-alt-fill text-warning"></i> Live Tracking
+            </a>
+          </li>
+          {% endif %}
+        </ul>
+        <div class="p-3 border-top border-secondary text-center">
+          <small class="text-muted">TransitOps v1.0 &copy; 2026</small>
+        </div>
+      </nav>
+      {% endif %}
+
+      <!-- Main Content Area -->
+      <div class="main-content">
+        <!-- Top Navbar -->
+        <nav class="navbar navbar-expand navbar-custom navbar-light px-4 py-2">
+          <div class="container-fluid p-0">
+            <span class="navbar-brand d-md-none fw-bold text-dark">
+              <i class="bi bi-truck text-info me-2"></i>TransitOps
+            </span>
+            <div class="ms-auto d-flex align-items-center gap-3">
+              <!-- Dark Mode Toggle Button -->
+              <button id="dark-mode-toggle" class="btn btn-outline-secondary border-0 btn-sm rounded-circle p-2 d-flex align-items-center justify-content-center" title="Toggle Theme" style="width: 38px; height: 38px;">
+                <i class="bi bi-moon-stars-fill fs-5" id="dark-mode-icon"></i>
+              </button>
+
+              {% if session.get('user_id') %}
+                <div class="dropdown">
+                  <a class="nav-link dropdown-toggle d-flex align-items-center gap-2" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false" id="user-profile-dropdown">
+                    <i class="bi bi-person-circle fs-5 text-secondary"></i>
+                    <div class="text-start d-none d-sm-block">
+                      <div class="fw-bold fs-7 lh-sm text-dark">{{ session.get('user_name') }}</div>
+                      <small class="text-muted fs-8 lh-sm">{{ session.get('user_email') }}</small>
+                    </div>
+                  </a>
+                  <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                    <li><h6 class="dropdown-header">System Access</h6></li>
+                    <li>
+                      <span class="dropdown-item-text">
+                        Role: <strong class="text-primary">{{ session.get('user_role') }}</strong>
+                      </span>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" href="/settings" id="btn-settings"><i class="bi bi-gear me-2"></i>Settings</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item text-danger" href="/logout" id="btn-logout"><i class="bi bi-box-arrow-right me-2"></i>Logout</a></li>
+                  </ul>
+                </div>
+              {% endif %}
+            </div>
+          </div>
+        </nav>
+
+        <!-- Flash messages -->
+        <div class="container-fluid mt-3 px-4">
+          {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+              {% for category, message in messages %}
+                <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert" id="flash-message">
+                  {{ message }}
+                  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+              {% endfor %}
+            {% endif %}
+          {% endwith %}
+        </div>
+
+        <!-- Main Body -->
+        <main class="p-4 container-fluid flex-grow-1">
+          {% block content %}{% endblock %}
+        </main>
+      </div>
+    </div>
+
+    <!-- Bootstrap 5.3 JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Global Iframe-Safe Confirmation Modal -->
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        let formToSubmit = null;
+        
+        // Dynamically insert the global modal markup
+        const modalHtml = `
+          <div class="modal fade" id="globalConfirmModal" tabindex="-1" aria-labelledby="globalConfirmModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+              <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header bg-dark text-white py-3">
+                  <h5 class="modal-title fw-bold" id="globalConfirmModalLabel">
+                    <i class="bi bi-question-circle-fill text-warning me-2"></i>Confirm Action
+                  </h5>
+                  <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4 text-center fs-6 text-dark" id="globalConfirmModalBody">
+                  Are you sure you want to proceed with this action?
+                </div>
+                <div class="modal-footer bg-light border-top-0 py-3 d-flex justify-content-center gap-3">
+                  <button type="button" class="btn btn-outline-secondary px-4 btn-sm" data-bs-dismiss="modal">Cancel</button>
+                  <button type="button" class="btn px-4 btn-sm" id="globalConfirmModalBtn">Confirm</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+        
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        const confirmModalEl = document.getElementById('globalConfirmModal');
+        const confirmModal = new bootstrap.Modal(confirmModalEl);
+        const confirmBtn = document.getElementById('globalConfirmModalBtn');
+        const modalBody = document.getElementById('globalConfirmModalBody');
+        
+        function setupConfirmForms() {
+          const forms = document.querySelectorAll('form[onsubmit*="confirm"]');
+          forms.forEach(form => {
+            const onsubmitStr = form.getAttribute('onsubmit');
+            if (onsubmitStr && onsubmitStr.includes('confirm')) {
+              form.removeAttribute('onsubmit'); // Strip the native confirm handler
+              
+              // Extract the confirm message
+              let message = "Are you sure you want to proceed?";
+              const match = onsubmitStr.match(/confirm\(['"](.+?)['"]\)/);
+              if (match && match[1]) {
+                message = match[1];
+              }
+              form.setAttribute('data-confirm-message', message);
+              
+              // Bind a standard submit interceptor
+              form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                formToSubmit = form;
+                
+                const msg = this.getAttribute('data-confirm-message');
+                modalBody.textContent = msg;
+                
+                // Color button based on severity of action
+                const lowerMsg = msg.toLowerCase();
+                if (lowerMsg.includes('delete') || lowerMsg.includes('deactivate') || lowerMsg.includes('suspend') || lowerMsg.includes('cancel') || lowerMsg.includes('retire')) {
+                  confirmBtn.className = 'btn btn-danger px-4 btn-sm';
+                } else {
+                  confirmBtn.className = 'btn btn-primary px-4 btn-sm';
+                }
+                
+                confirmModal.show();
+              });
+            }
+          });
+        }
+        
+        // Initial setup
+        setupConfirmForms();
+        
+        // Watch for dynamically loaded list content
+        const observer = new MutationObserver(function() {
+          setupConfirmForms();
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+        
+        // Execute actual submit upon confirmation
+        confirmBtn.addEventListener('click', function() {
+          if (formToSubmit) {
+            formToSubmit.submit(); // Natively submit the form bypassing event handlers
+            confirmModal.hide();
+          }
+        });
+
+        // --- Dark Mode / Theme Toggle Logic ---
+        const themeToggleBtn = document.getElementById('dark-mode-toggle');
+        const themeIcon = document.getElementById('dark-mode-icon');
+        const settingsSwitch = document.getElementById('settings-dark-mode-switch');
+        
+        function updateThemeElements(theme) {
+          document.documentElement.setAttribute('data-bs-theme', theme);
+          localStorage.setItem('theme', theme);
+          
+          // Update navbar toggle button icon
+          if (themeIcon) {
+            if (theme === 'dark') {
+              themeIcon.className = 'bi bi-sun-fill text-warning fs-5';
+            } else {
+              themeIcon.className = 'bi bi-moon-stars-fill fs-5';
+            }
+          }
+          
+          // Update Settings page switch if present
+          if (settingsSwitch) {
+            settingsSwitch.checked = (theme === 'dark');
+            const settingsIcon = document.getElementById('settings-theme-icon');
+            const settingsTitle = document.getElementById('settings-theme-title');
+            if (settingsIcon) {
+              settingsIcon.className = theme === 'dark' ? 'bi bi-sun-fill fs-4 text-warning' : 'bi bi-moon-stars-fill fs-4 text-primary';
+            }
+            if (settingsTitle) {
+              settingsTitle.textContent = theme === 'dark' ? 'Dark Mode Enabled' : 'Dark Mode Disabled';
+            }
+          }
+        }
+        
+        // Initial setup on DOM load
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        updateThemeElements(savedTheme);
+        
+        if (themeToggleBtn) {
+          themeToggleBtn.addEventListener('click', function() {
+            const currentTheme = document.documentElement.getAttribute('data-bs-theme') || 'light';
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            updateThemeElements(newTheme);
+          });
+        }
+        
+        if (settingsSwitch) {
+          settingsSwitch.addEventListener('change', function() {
+            const newTheme = this.checked ? 'dark' : 'light';
+            updateThemeElements(newTheme);
+          });
+        }
+      });
+
+      // Real-time Driver GPS Tracking Engine
+      (function() {
+        const currentDriverId = {{ current_driver_id|tojson if current_driver_id else 'null' }};
+        const activeTripId = {{ active_trip_id|tojson if active_trip_id else 'null' }};
+        
+        if (!currentDriverId || !activeTripId) return;
+
+        let lastStoredCheckpoint = null;
+        let watchId = null;
+        let pendingCheckpoints = JSON.parse(localStorage.getItem('pending_checkpoints') || '[]');
+
+        function getDistance(lat1, lon1, lat2, lon2) {
+          const R = 6371e3; // Earth radius in meters
+          const phi1 = lat1 * Math.PI / 180;
+          const phi2 = lat2 * Math.PI / 180;
+          const deltaPhi = (lat2 - lat1) * Math.PI / 180;
+          const deltaLambda = (lon2 - lon1) * Math.PI / 180;
+          const a = Math.sin(deltaPhi/2) * Math.sin(deltaPhi/2) +
+                    Math.cos(phi1) * Math.cos(phi2) *
+                    Math.sin(deltaLambda/2) * Math.sin(deltaLambda/2);
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+          return R * c;
+        }
+
+        async function syncCheckpoints() {
+          if (pendingCheckpoints.length === 0) return;
+          if (!navigator.onLine) return;
+
+          const toUpload = [...pendingCheckpoints];
+          for (const cp of toUpload) {
+            try {
+              const res = await fetch('/api/location/update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(cp)
+              });
+              if (res.ok) {
+                pendingCheckpoints = pendingCheckpoints.filter(item => item.timestamp !== cp.timestamp);
+                localStorage.setItem('pending_checkpoints', JSON.stringify(pendingCheckpoints));
+              } else if (res.status === 401 || res.status === 403) {
+                break;
+              } else {
+                break;
+              }
+            } catch (err) {
+              console.error("Tracking upload error:", err);
+              break;
+            }
+          }
+        }
+
+        function startTracking() {
+          if (!navigator.geolocation) return;
+
+          const localLast = localStorage.getItem(`last_checkpoint_${activeTripId}`);
+          if (localLast) {
+            try {
+              lastStoredCheckpoint = JSON.parse(localLast);
+            } catch(e) {}
+          }
+
+          watchId = navigator.geolocation.watchPosition(
+            function(position) {
+              const lat = position.coords.latitude;
+              const lng = position.coords.longitude;
+              const speed = position.coords.speed;
+              const heading = position.coords.heading;
+              const accuracy = position.coords.accuracy;
+              const now = new Date();
+
+              let shouldStore = false;
+              if (!lastStoredCheckpoint) {
+                shouldStore = true;
+              } else {
+                const dist = getDistance(lastStoredCheckpoint.latitude, lastStoredCheckpoint.longitude, lat, lng);
+                const timeElapsed = now - new Date(lastStoredCheckpoint.timestamp);
+
+                // Travelled > 250m OR > 2 mins (120000ms)
+                if (dist > 250 || timeElapsed > 120000) {
+                  shouldStore = true;
+                }
+              }
+
+              if (shouldStore) {
+                const checkpoint = {
+                  trip_id: activeTripId,
+                  driver_id: currentDriverId,
+                  latitude: lat,
+                  longitude: lng,
+                  speed: speed,
+                  heading: heading,
+                  accuracy: accuracy,
+                  timestamp: now.toISOString()
+                };
+
+                pendingCheckpoints.push(checkpoint);
+                localStorage.setItem('pending_checkpoints', JSON.stringify(pendingCheckpoints));
+
+                lastStoredCheckpoint = checkpoint;
+                localStorage.setItem(`last_checkpoint_${activeTripId}`, JSON.stringify(checkpoint));
+
+                syncCheckpoints();
+              }
+            },
+            function(err) {
+              console.warn("Geolocation watch warning:", err);
+            },
+            {
+              enableHighAccuracy: true,
+              maximumAge: 15000,
+              timeout: 15000
+            }
+          );
+        }
+
+        // Initialize Tracking Engine
+        startTracking();
+        syncCheckpoints();
+
+        // Sync when internet returns
+        window.addEventListener('online', syncCheckpoints);
+      })();
+    </script>
+
+    {% block extra_js %}{% endblock %}
+  </body>
+</html>

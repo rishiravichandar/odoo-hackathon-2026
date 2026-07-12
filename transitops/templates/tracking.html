@@ -1,0 +1,377 @@
+{% extends "base.html" %}
+
+{% block title %}TransitOps - Driver Live Tracking{% endblock %}
+
+{% block extra_css %}
+<!-- Leaflet Map CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+<style>
+  #map {
+    height: 520px;
+    width: 100%;
+    border-radius: 16px;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    background-color: #f8fafc;
+  }
+  .custom-div-icon {
+    background: transparent !important;
+    border: none !important;
+  }
+  .bento-card {
+    background: #ffffff;
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    border-radius: 16px;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .bento-header {
+    font-size: 0.9rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #475569;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <!-- Offline Alert Warning -->
+  <div id="offline-warning" class="alert alert-danger d-none border-0 shadow-sm rounded-3 mb-4 d-flex align-items-center gap-3" role="alert">
+    <div class="bg-danger bg-opacity-10 text-danger p-2 rounded-circle">
+      <i class="bi bi-wifi-off fs-5"></i>
+    </div>
+    <div>
+      <h6 class="alert-heading fw-bold m-0 text-danger">Internet connection unavailable.</h6>
+      <span class="small">Reconnect to continue live tracking. Polling is paused.</span>
+    </div>
+  </div>
+
+  <!-- Welcome/Header Block -->
+  <div class="row g-4 mb-4">
+    <div class="col-12">
+      <div class="card border-0 shadow-sm rounded-4 text-white p-4" style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+          <div>
+            <span class="badge bg-warning text-dark mb-2 fw-bold px-3 py-1.5" style="letter-spacing: 0.5px; font-size: 0.7rem;">FLEET OPERATIONS COMMAND</span>
+            <h2 class="fw-bold m-0 text-white">Fleet Live GPS Tracking</h2>
+            <p class="mb-0 text-slate-300 small">Monitor vehicle routes, real-time driver coordinates, and path histories dynamically.</p>
+          </div>
+          <div class="d-flex align-items-center gap-2 bg-white bg-opacity-10 px-4 py-3 rounded-3 border border-white border-opacity-10">
+            <div>
+              <label for="trip-selector" class="form-label text-white-50 m-0 small fw-bold font-mono" style="font-size: 10px; letter-spacing: 0.05em;">SELECT ACTIVE DISPATCH</label>
+              <select class="form-select form-select-sm bg-dark text-white border-secondary fw-semibold mt-1" id="trip-selector" style="min-width: 250px;">
+                <option value="">-- Choose Dispatched Trip --</option>
+                {% for trip in active_trips %}
+                  <option value="{{ trip.id }}">TRIP-{{ trip.id }} ({{ trip.driver_name }} - {{ trip.vehicle_reg }})</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <!-- Map Canvas (Left/Top) -->
+    <div class="col-xl-8">
+      <div class="bento-card p-3 h-100">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <div class="bento-header d-flex align-items-center gap-2">
+            <i class="bi bi-map-fill text-primary"></i> Live route telemetry
+          </div>
+          <span class="badge bg-light text-dark font-mono border" style="font-size: 0.75rem;">10s Auto Refresh</span>
+        </div>
+        <div id="map"></div>
+      </div>
+    </div>
+
+    <!-- Telemetry Details Sidebar (Right/Bottom) -->
+    <div class="col-xl-4 d-flex flex-column gap-4">
+      <!-- Active Trip Metrics Card -->
+      <div class="bento-card p-4">
+        <div class="bento-header d-flex align-items-center mb-3 border-bottom pb-2">
+          <i class="bi bi-info-circle-fill text-warning me-2"></i>Active Telemetry Details
+        </div>
+        
+        <div class="vstack gap-3 text-dark">
+          <div class="d-flex justify-content-between align-items-center">
+            <span class="text-secondary small">Driver:</span>
+            <span class="fw-bold fs-6" id="driver-name">-</span>
+          </div>
+          <div class="d-flex justify-content-between align-items-center">
+            <span class="text-secondary small">Vehicle Plate:</span>
+            <span class="badge bg-secondary-subtle text-dark font-mono fs-7" id="vehicle-reg">-</span>
+          </div>
+          <div class="d-flex justify-content-between align-items-center">
+            <span class="text-secondary small">Status:</span>
+            <span class="badge bg-primary bg-opacity-10 text-primary fw-bold" id="trip-status">-</span>
+          </div>
+          <div class="d-flex justify-content-between align-items-center">
+            <span class="text-secondary small">Assigned Route:</span>
+            <span class="fw-semibold small" id="trip-route">-</span>
+          </div>
+          <div class="d-flex justify-content-between align-items-center">
+            <span class="text-secondary small">Coordinates:</span>
+            <span class="font-mono small fw-bold text-primary" id="current-coords">-</span>
+          </div>
+          <div class="d-flex justify-content-between align-items-center">
+            <span class="text-secondary small">Last Signal:</span>
+            <span class="font-mono small" id="last-updated">-</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live GPS Checkpoint Feed -->
+      <div class="bento-card p-4 flex-grow-1" style="max-height: 290px; overflow-y: auto;">
+        <div class="bento-header d-flex align-items-center mb-3 border-bottom pb-2">
+          <i class="bi bi-activity text-success me-2"></i>Checkpoint History Logs
+        </div>
+        
+        <!-- No Data Indicator -->
+        <div id="no-data-alert" class="text-center py-4 text-muted border border-dashed rounded-3">
+          <i class="bi bi-geo-alt fs-2 text-warning d-block mb-2"></i>
+          <span class="small fw-semibold d-block">No coordinates received yet</span>
+          <span class="text-muted xs-text">Waiting for driver location transmissions...</span>
+        </div>
+
+        <div class="table-responsive">
+          <table class="table table-sm table-premium table-hover align-middle mb-0 text-dark">
+            <thead>
+              <tr class="font-mono text-uppercase" style="font-size: 10px; color: #64748b;">
+                <th>Time</th>
+                <th>Coords</th>
+                <th>Speed</th>
+                <th>Acc.</th>
+              </tr>
+            </thead>
+            <tbody id="checkpoint-history">
+              <tr>
+                <td colspan="4" class="text-center text-muted small py-4">Select a trip to view live tracking history.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Leaflet Map JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+  let pollingInterval = null;
+  let currentTripId = null;
+  let marker = null;
+  let pathPolyline = null;
+  let sourceMarker = null;
+  let destMarker = null;
+
+  // Initialize Leaflet Map
+  const map = L.map('map').setView([20.5937, 78.9629], 5);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '© OpenStreetMap contributors'
+  }).addTo(map);
+
+  // Custom DivIcon Markers using SVG and Bootstrap Icons
+  const driverIcon = L.divIcon({
+    html: '<div style="background-color: #0d6efd; color: white; width: 36px; height: 36px; border-radius: 50%; border: 3px solid white; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3);"><i class="bi bi-truck fs-5"></i></div>',
+    className: 'custom-div-icon',
+    iconSize: [36, 36],
+    iconAnchor: [18, 18]
+  });
+
+  const sourceIcon = L.divIcon({
+    html: '<div style="background-color: #198754; color: white; width: 30px; height: 30px; border-radius: 50%; border: 2px solid white; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3);"><i class="bi bi-geo-alt-fill"></i></div>',
+    className: 'custom-div-icon',
+    iconSize: [30, 30],
+    iconAnchor: [15, 30]
+  });
+
+  const destIcon = L.divIcon({
+    html: '<div style="background-color: #dc3545; color: white; width: 30px; height: 30px; border-radius: 50%; border: 2px solid white; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3);"><i class="bi bi-flag-fill"></i></div>',
+    className: 'custom-div-icon',
+    iconSize: [30, 30],
+    iconAnchor: [15, 30]
+  });
+
+  async function updateTracking() {
+    if (!currentTripId) return;
+    if (!navigator.onLine) {
+      document.getElementById('offline-warning').classList.remove('d-none');
+      return;
+    }
+    document.getElementById('offline-warning').classList.add('d-none');
+
+    try {
+      const res = await fetch(`/api/location/history/${currentTripId}`);
+      if (!res.ok) {
+        if (res.status === 403) {
+          alert("Access Denied: Only Fleet Managers are authorized.");
+          stopPolling();
+        }
+        return;
+      }
+      const data = await res.json();
+      
+      // Update sidebar metadata
+      document.getElementById('driver-name').textContent = data.driver_name || 'N/A';
+      document.getElementById('vehicle-reg').textContent = data.vehicle_reg || 'N/A';
+      document.getElementById('trip-status').textContent = data.status || 'N/A';
+      document.getElementById('trip-route').textContent = `${data.source} ➔ ${data.destination}`;
+
+      const checkpoints = data.checkpoints;
+      const historyBody = document.getElementById('checkpoint-history');
+      historyBody.innerHTML = '';
+
+      // Plot Static Source & Dest Pins
+      plotSourceDest(data);
+
+      if (checkpoints.length === 0) {
+        document.getElementById('last-updated').textContent = "Waiting for initial GPS signal...";
+        document.getElementById('current-coords').textContent = "N/A";
+        document.getElementById('no-data-alert').classList.remove('d-none');
+        
+        // Remove tracking markers/lines if they exist
+        if (marker) { map.removeLayer(marker); marker = null; }
+        if (pathPolyline) { map.removeLayer(pathPolyline); pathPolyline = null; }
+
+        // Fit map bounds to source & destination points
+        fitMapBoundsWithPoints(data);
+        return;
+      }
+
+      document.getElementById('no-data-alert').classList.add('d-none');
+      
+      const latest = checkpoints[checkpoints.length - 1];
+      const lastDate = new Date(latest.created_at);
+      document.getElementById('last-updated').textContent = lastDate.toLocaleTimeString();
+      document.getElementById('current-coords').textContent = `${latest.latitude.toFixed(5)}, ${latest.longitude.toFixed(5)}`;
+
+      // Populate history feed table
+      checkpoints.slice().reverse().forEach((cp) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td class="font-mono small py-1.5">${new Date(cp.created_at).toLocaleTimeString()}</td>
+          <td class="font-mono small py-1.5">${cp.latitude.toFixed(4)}, ${cp.longitude.toFixed(4)}</td>
+          <td class="small py-1.5">${cp.speed !== null && cp.speed >= 0 ? (cp.speed * 3.6).toFixed(1) + ' km/h' : 'N/A'}</td>
+          <td class="small py-1.5">${cp.accuracy !== null ? cp.accuracy.toFixed(1) + ' m' : 'N/A'}</td>
+        `;
+        historyBody.appendChild(row);
+      });
+
+      // Update map line path
+      const latlngs = checkpoints.map(cp => [cp.latitude, cp.longitude]);
+      if (pathPolyline) {
+        pathPolyline.setLatLngs(latlngs);
+      } else {
+        pathPolyline = L.polyline(latlngs, { color: '#0d6efd', weight: 5, opacity: 0.8 }).addTo(map);
+      }
+
+      // Update current driver location marker
+      const currentPos = [latest.latitude, latest.longitude];
+      if (marker) {
+        marker.setLatLng(currentPos);
+      } else {
+        marker = L.marker(currentPos, { icon: driverIcon }).addTo(map);
+      }
+      marker.bindPopup(`<strong>${data.driver_name}</strong><br>Driver is currently en route<br>Last signal: ${lastDate.toLocaleTimeString()}`).openPopup();
+
+      // Pan & zoom map automatically to fit active routes
+      const bounds = L.latLngBounds(latlngs);
+      if (data.source_latitude && data.source_longitude) bounds.extend([data.source_latitude, data.source_longitude]);
+      if (data.destination_latitude && data.destination_longitude) bounds.extend([data.destination_latitude, data.destination_longitude]);
+      map.fitBounds(bounds, { padding: [50, 50] });
+
+    } catch (err) {
+      console.error("Error updating tracking data:", err);
+    }
+  }
+
+  function plotSourceDest(data) {
+    if (data.source_latitude && data.source_longitude) {
+      const sPos = [data.source_latitude, data.source_longitude];
+      if (sourceMarker) {
+        sourceMarker.setLatLng(sPos);
+      } else {
+        sourceMarker = L.marker(sPos, { icon: sourceIcon }).addTo(map);
+      }
+      sourceMarker.bindPopup(`<strong>Origin Terminal: ${data.source}</strong>`);
+    }
+    if (data.destination_latitude && data.destination_longitude) {
+      const dPos = [data.destination_latitude, data.destination_longitude];
+      if (destMarker) {
+        destMarker.setLatLng(dPos);
+      } else {
+        destMarker = L.marker(dPos, { icon: destIcon }).addTo(map);
+      }
+      destMarker.bindPopup(`<strong>Destination Terminal: ${data.destination}</strong>`);
+    }
+  }
+
+  function fitMapBoundsWithPoints(data) {
+    const points = [];
+    if (data.source_latitude && data.source_longitude) points.push([data.source_latitude, data.source_longitude]);
+    if (data.destination_latitude && data.destination_longitude) points.push([data.destination_latitude, data.destination_longitude]);
+    if (points.length > 0) {
+      map.fitBounds(L.latLngBounds(points), { padding: [100, 100] });
+    }
+  }
+
+  function startPolling() {
+    stopPolling();
+    updateTracking();
+    pollingInterval = setInterval(updateTracking, 10000);
+  }
+
+  function stopPolling() {
+    if (pollingInterval) {
+      clearInterval(pollingInterval);
+      pollingInterval = null;
+    }
+  }
+
+  // Handle Dispatch Selection Change
+  document.getElementById('trip-selector').addEventListener('change', function() {
+    currentTripId = this.value;
+    
+    // Reset markers/paths
+    if (marker) { map.removeLayer(marker); marker = null; }
+    if (pathPolyline) { map.removeLayer(pathPolyline); pathPolyline = null; }
+    if (sourceMarker) { map.removeLayer(sourceMarker); sourceMarker = null; }
+    if (destMarker) { map.removeLayer(destMarker); destMarker = null; }
+    
+    if (currentTripId) {
+      startPolling();
+    } else {
+      stopPolling();
+      // Reset sidebar labels
+      document.getElementById('driver-name').textContent = '-';
+      document.getElementById('vehicle-reg').textContent = '-';
+      document.getElementById('trip-status').textContent = '-';
+      document.getElementById('trip-route').textContent = '-';
+      document.getElementById('last-updated').textContent = '-';
+      document.getElementById('current-coords').textContent = '-';
+      document.getElementById('no-data-alert').classList.remove('d-none');
+      document.getElementById('checkpoint-history').innerHTML = '<tr><td colspan="4" class="text-center text-muted small py-4">Select a trip to view live tracking history.</td></tr>';
+      map.setView([20.5937, 78.9629], 5);
+    }
+  });
+
+  // Handle Online/Offline Status
+  window.addEventListener('online', function() {
+    document.getElementById('offline-warning').classList.add('d-none');
+    if (currentTripId) startPolling();
+  });
+
+  window.addEventListener('offline', function() {
+    document.getElementById('offline-warning').classList.remove('d-none');
+    stopPolling();
+  });
+</script>
+{% endblock %}

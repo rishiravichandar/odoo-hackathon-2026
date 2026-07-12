@@ -1,0 +1,470 @@
+{% extends 'base.html' %}
+
+{% block title %}Fleet Maintenance - TransitOps{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h2 class="fw-bold text-dark m-0">Maintenance Center</h2>
+    <p class="text-secondary small m-0">Schedule, execute, track, and analyze fleet physical asset maintenance lifecycle</p>
+  </div>
+  <button type="button" class="btn btn-primary d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#scheduleMaintenanceModal" id="btn-schedule-maintenance">
+    <i class="bi bi-calendar-plus"></i> Schedule Service
+  </button>
+</div>
+
+<!-- Maintenance KPI Dashboard -->
+<div class="row g-3 mb-4">
+  <!-- Total Jobs -->
+  <div class="col-6 col-sm-4 col-md-2">
+    <div class="card border-0 shadow-sm bg-white h-100">
+      <div class="card-body p-3 text-center">
+        <div class="p-2 rounded-3 bg-secondary bg-opacity-10 text-secondary mx-auto mb-2" style="width: fit-content;">
+          <i class="bi bi-wrench-adjustable fs-5"></i>
+        </div>
+        <span class="text-muted small fw-semibold d-block">Total Jobs</span>
+        <h4 class="fw-bold m-0 text-dark mt-1" id="kpi-total-jobs">{{ kpis.total_jobs }}</h4>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Scheduled -->
+  <div class="col-6 col-sm-4 col-md-2">
+    <div class="card border-0 shadow-sm bg-white h-100">
+      <div class="card-body p-3 text-center">
+        <div class="p-2 rounded-3 bg-warning bg-opacity-10 text-warning mx-auto mb-2" style="width: fit-content;">
+          <i class="bi bi-calendar-event fs-5"></i>
+        </div>
+        <span class="text-muted small fw-semibold d-block">Scheduled</span>
+        <h4 class="fw-bold m-0 text-dark mt-1" id="kpi-scheduled-jobs">{{ kpis.scheduled }}</h4>
+      </div>
+    </div>
+  </div>
+
+  <!-- Under Maintenance -->
+  <div class="col-6 col-sm-4 col-md-2">
+    <div class="card border-0 shadow-sm bg-white h-100">
+      <div class="card-body p-3 text-center">
+        <div class="p-2 rounded-3 bg-primary bg-opacity-10 text-primary mx-auto mb-2" style="width: fit-content;">
+          <i class="bi bi-cone-striped fs-5"></i>
+        </div>
+        <span class="text-muted small fw-semibold d-block">In Progress</span>
+        <h4 class="fw-bold m-0 text-dark mt-1" id="kpi-inprogress-jobs">{{ kpis.under_maintenance }}</h4>
+      </div>
+    </div>
+  </div>
+
+  <!-- Completed -->
+  <div class="col-6 col-sm-4 col-md-2">
+    <div class="card border-0 shadow-sm bg-white h-100">
+      <div class="card-body p-3 text-center">
+        <div class="p-2 rounded-3 bg-success bg-opacity-10 text-success mx-auto mb-2" style="width: fit-content;">
+          <i class="bi bi-check2-circle fs-5"></i>
+        </div>
+        <span class="text-muted small fw-semibold d-block">Completed</span>
+        <h4 class="fw-bold m-0 text-dark mt-1" id="kpi-completed-jobs">{{ kpis.completed }}</h4>
+      </div>
+    </div>
+  </div>
+
+  <!-- Overdue -->
+  <div class="col-6 col-sm-4 col-md-2">
+    <div class="card border-0 shadow-sm bg-white h-100">
+      <div class="card-body p-3 text-center">
+        <div class="p-2 rounded-3 bg-danger bg-opacity-10 text-danger mx-auto mb-2" style="width: fit-content;">
+          <i class="bi bi-clock-history fs-5"></i>
+        </div>
+        <span class="text-muted small fw-semibold d-block">Overdue</span>
+        <h4 class="fw-bold m-0 text-dark mt-1" id="kpi-overdue-jobs">{{ kpis.overdue }}</h4>
+      </div>
+    </div>
+  </div>
+
+  <!-- Total Expenditure -->
+  <div class="col-6 col-sm-4 col-md-2">
+    <div class="card border-0 shadow-sm bg-white h-100">
+      <div class="card-body p-3 text-center">
+        <div class="p-2 rounded-3 bg-dark bg-opacity-10 text-dark mx-auto mb-2" style="width: fit-content;">
+          <i class="bi bi-cash-stack fs-5"></i>
+        </div>
+        <span class="text-muted small fw-semibold d-block">Total Cost</span>
+        <h4 class="fw-bold m-0 text-dark mt-1" id="kpi-total-cost" style="font-size: 1.15rem;">₹{{ "{:,.0f}".format(kpis.total_cost) }}</h4>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Dynamic Maintenance Alerts Banner on list page -->
+{% if alerts %}
+<div class="alert alert-warning border-0 shadow-sm rounded-3 mb-4 p-3" role="alert">
+  <div class="d-flex align-items-center mb-1">
+    <i class="bi bi-exclamation-triangle-fill text-danger me-2"></i>
+    <strong class="text-dark">Maintenance Alerts Triggered ({{ alerts|length }})</strong>
+  </div>
+  <p class="text-secondary small mb-2">The system has flagged the following issues requiring attention:</p>
+  <ul class="mb-0 text-secondary small ps-3">
+    {% for alert in alerts %}
+      <li class="mb-1">
+        <span class="text-{{ alert.severity }} fw-bold">[{{ alert.type | upper }}]</span> 
+        Vehicle <strong class="text-dark">{{ alert.registration_number }}</strong>: {{ alert.message }}
+        {% if alert.maintenance_id %}
+          <a href="/maintenance/{{ alert.maintenance_id }}" class="ms-1 fw-bold text-decoration-none">Go to Job MNT-{{ alert.maintenance_id }} &rarr;</a>
+        {% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+<!-- Search & Filtering Bar -->
+<div class="card border-0 shadow-sm mb-4 rounded-3">
+  <div class="card-body p-3">
+    <form method="GET" action="/maintenance" class="row g-2 align-items-end" id="maintenance-filter-form">
+      <!-- Search string -->
+      <div class="col-md-3">
+        <label for="search_q" class="form-label text-secondary small fw-semibold mb-1">Search</label>
+        <div class="input-group input-group-sm">
+          <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+          <input type="text" class="form-control border-start-0" id="search_q" name="q" value="{{ q_search }}" placeholder="Vehicle, tech, or notes...">
+        </div>
+      </div>
+
+      <!-- Vehicle filter -->
+      <div class="col-md-2">
+        <label for="filter_vehicle" class="form-label text-secondary small fw-semibold mb-1">Vehicle</label>
+        <select class="form-select form-select-sm" id="filter_vehicle" name="vehicle_id">
+          <option value="">All Vehicles</option>
+          {% for v in vehicles_list %}
+            <option value="{{ v.id }}" {% if f_vehicle_id == v.id|string %}selected{% endif %}>{{ v.registration_number }} ({{ v.name }})</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Service Type filter -->
+      <div class="col-md-2">
+        <label for="filter_type" class="form-label text-secondary small fw-semibold mb-1">Service Type</label>
+        <select class="form-select form-select-sm" id="filter_type" name="maintenance_type">
+          <option value="">All Types</option>
+          {% for t in types_list %}
+            <option value="{{ t }}" {% if f_type == t %}selected{% endif %}>{{ t }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Status filter -->
+      <div class="col-md-2">
+        <label for="filter_status" class="form-label text-secondary small fw-semibold mb-1">Status</label>
+        <select class="form-select form-select-sm" id="filter_status" name="status">
+          <option value="">All Statuses</option>
+          {% for s in statuses_list %}
+            <option value="{{ s }}" {% if f_status == s %}selected{% endif %}>{{ s }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Sort Selection -->
+      <div class="col-md-2">
+        <label for="sort_by" class="form-label text-secondary small fw-semibold mb-1">Sort By</label>
+        <select class="form-select form-select-sm" id="sort_by" name="sort_by">
+          <option value="scheduled_date" {% if sort_by == 'scheduled_date' %}selected{% endif %}>Scheduled Date</option>
+          <option value="cost" {% if sort_by == 'cost' %}selected{% endif %}>Cost</option>
+          <option value="odometer" {% if sort_by == 'odometer' %}selected{% endif %}>Odometer</option>
+        </select>
+      </div>
+
+      <!-- Action buttons -->
+      <div class="col-md-1 d-grid">
+        <button type="submit" class="btn btn-primary btn-sm" id="btn-apply-filters">Filter</button>
+      </div>
+    </form>
+    
+    <div class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top border-light">
+      <div class="row g-2 align-items-center" style="width: 100%;">
+        <div class="col-md-3">
+          <div class="d-flex align-items-center">
+            <span class="small text-secondary me-2 text-nowrap">Service Center:</span>
+            <select class="form-select form-select-sm" name="service_center" form="maintenance-filter-form" onchange="this.form.submit()">
+              <option value="">All Centers</option>
+              {% for center in centers_list %}
+                <option value="{{ center }}" {% if f_service_center == center %}selected{% endif %}>{{ center }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="col-md-5">
+          <div class="d-flex align-items-center">
+            <span class="small text-secondary me-2 text-nowrap">Scheduled Date:</span>
+            <input type="date" class="form-control form-control-sm me-2" name="date_from" value="{{ f_date_from }}" form="maintenance-filter-form" placeholder="From">
+            <span class="small text-secondary me-2">to</span>
+            <input type="date" class="form-control form-control-sm" name="date_to" value="{{ f_date_to }}" form="maintenance-filter-form" placeholder="To">
+          </div>
+        </div>
+        <div class="col-md-2">
+          <select class="form-select form-select-sm" name="sort_order" form="maintenance-filter-form" onchange="this.form.submit()">
+            <option value="DESC" {% if sort_order == 'DESC' %}selected{% endif %}>Descending</option>
+            <option value="ASC" {% if sort_order == 'ASC' %}selected{% endif %}>Ascending</option>
+          </select>
+        </div>
+        <div class="col-md-2 text-end">
+          <a href="/maintenance" class="btn btn-outline-secondary btn-sm" id="btn-clear-filters"><i class="bi bi-x-circle me-1"></i> Clear All</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Maintenance Records Table -->
+<div class="card border-0 shadow-sm rounded-3">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle m-0" id="table-maintenance-logs">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-4">Job ID</th>
+            <th>Vehicle Asset</th>
+            <th>Service Type</th>
+            <th>Service Center / Tech</th>
+            <th>Scheduled Date</th>
+            <th>Completed Date</th>
+            <th class="text-end">Est. Cost</th>
+            <th class="text-end">Actual Cost</th>
+            <th class="text-end">Odometer</th>
+            <th>Status</th>
+            <th class="text-center pe-4" style="width: 170px;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for log in logs %}
+          <tr>
+            <td class="ps-4 fw-mono text-dark font-mono text-xs">
+              <a href="/maintenance/{{ log.id }}" class="fw-bold text-decoration-none text-primary">MNT-{{ log.id }}</a>
+            </td>
+            <td>
+              <div class="fw-bold text-dark">{{ log.vehicle_reg }}</div>
+              <small class="text-muted d-block">{{ log.vehicle_name }} ({{ log.vehicle_type }})</small>
+            </td>
+            <td>
+              <span class="badge bg-light text-dark border">{{ log.maintenance_type or 'General' }}</span>
+            </td>
+            <td>
+              <div class="fw-semibold text-dark small">{{ log.service_center or 'N/A' }}</div>
+              <small class="text-secondary" style="font-size: 0.75rem;"><i class="bi bi-person me-1"></i>{{ log.technician_name or 'No technician assigned' }}</small>
+            </td>
+            <td>{{ log.scheduled_date }}</td>
+            <td>
+              {% if log.completed_date %}
+                {{ log.completed_date }}
+              {% else %}
+                <span class="text-muted">&mdash;</span>
+              {% endif %}
+            </td>
+            <td class="text-end fw-medium text-secondary">₹{{ "{:,.2f}".format(log.estimated_cost or 0.0) }}</td>
+            <td class="text-end fw-bold text-dark">
+              {% if log.status == 'Completed' %}
+                ₹{{ "{:,.2f}".format(log.actual_cost or 0.0) }}
+              {% else %}
+                <span class="text-muted">&mdash;</span>
+              {% endif %}
+            </td>
+            <td class="text-end fw-medium text-secondary">{{ "{:,.0f}".format(log.current_odometer or 0.0) }} km</td>
+            <td>
+              {% if log.status == 'Scheduled' %}
+                <span class="badge bg-warning text-dark border border-warning-subtle rounded-pill px-2.5">Scheduled</span>
+              {% elif log.status == 'In Progress' %}
+                <span class="badge bg-primary text-white border border-primary-subtle rounded-pill px-2.5">In Progress</span>
+              {% elif log.status == 'Completed' %}
+                <span class="badge bg-success text-white border border-success-subtle rounded-pill px-2.5">Completed</span>
+              {% elif log.status == 'Overdue' %}
+                <span class="badge bg-danger text-white border border-danger-subtle rounded-pill px-2.5">Overdue</span>
+              {% else %}
+                <span class="badge bg-secondary text-white border border-secondary-subtle rounded-pill px-2.5">Cancelled</span>
+              {% endif %}
+            </td>
+            <td class="text-center pe-4">
+              <div class="d-inline-flex gap-1.5">
+                <!-- View Details -->
+                <a href="/maintenance/{{ log.id }}" class="btn btn-outline-secondary btn-sm p-1 px-2" title="Details" id="btn-details-{{ log.id }}">
+                  <i class="bi bi-eye"></i>
+                </a>
+                
+                {% if session.get('user_role') == 'Fleet Manager' %}
+                  <form action="/maintenance/delete/{{ log.id }}" method="POST" class="m-0 d-inline" onsubmit="return confirm('Are you sure you want to delete maintenance record MNT-{{ log.id }}? This action cannot be undone.')">
+                    <button type="submit" class="btn btn-outline-danger btn-sm p-1 px-2" title="Delete record" id="btn-delete-maintenance-{{ log.id }}">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </form>
+                {% endif %}
+                
+                <!-- Edit Action -->
+                {% if log.status in ['Scheduled', 'Overdue'] %}
+                  <a href="/maintenance/edit/{{ log.id }}" class="btn btn-outline-primary btn-sm p-1 px-2" title="Edit Schedule" id="btn-edit-{{ log.id }}">
+                    <i class="bi bi-pencil"></i>
+                  </a>
+                {% endif %}
+
+                <!-- Start Maintenance Action -->
+                {% if log.status in ['Scheduled', 'Overdue'] %}
+                  <form action="/maintenance/start/{{ log.id }}" method="POST" class="m-0" id="form-start-{{ log.id }}">
+                    <button type="submit" class="btn btn-outline-success btn-sm p-1 px-2" title="Start Service" id="btn-start-{{ log.id }}">
+                      <i class="bi bi-play-fill"></i>
+                    </button>
+                  </form>
+                {% endif %}
+
+                <!-- Cancel Maintenance Action -->
+                {% if log.status in ['Scheduled', 'Overdue', 'In Progress'] %}
+                  <button type="button" class="btn btn-outline-danger btn-sm p-1 px-2" title="Cancel Service" data-bs-toggle="modal" data-bs-target="#cancelModal-{{ log.id }}" id="btn-cancel-trigger-{{ log.id }}">
+                    <i class="bi bi-x-circle"></i>
+                  </button>
+                  
+                  <!-- Cancel Modal -->
+                  <div class="modal fade" id="cancelModal-{{ log.id }}" tabindex="-1" aria-labelledby="cancelModalLabel-{{ log.id }}" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                      <div class="modal-content text-start">
+                        <div class="modal-header">
+                          <h5 class="modal-title fw-bold" id="cancelModalLabel-{{ log.id }}">Cancel Maintenance MNT-{{ log.id }}</h5>
+                          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <form action="/maintenance/cancel/{{ log.id }}" method="POST" id="form-cancel-{{ log.id }}">
+                          <div class="modal-body">
+                            <p class="text-secondary small">Are you sure you want to cancel the maintenance scheduled for <strong class="text-dark">{{ log.vehicle_reg }}</strong>? This action cannot be undone.</p>
+                            <div class="mb-3">
+                              <label for="remarks-{{ log.id }}" class="form-label text-dark small fw-semibold">Reason for Cancellation <span class="text-danger">*</span></label>
+                              <textarea class="form-control form-control-sm" id="remarks-{{ log.id }}" name="remarks" rows="3" required placeholder="Specify why this service is being cancelled..."></textarea>
+                            </div>
+                          </div>
+                          <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Go Back</button>
+                            <button type="submit" class="btn btn-danger btn-sm">Confirm Cancellation</button>
+                          </div>
+                        </form>
+                      </div>
+                    </div>
+                  </div>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="11" class="text-center py-5 text-muted">
+              <i class="bi bi-wrench fs-1 d-block mb-3 text-secondary text-opacity-40"></i>
+              No maintenance records found matching the active filters.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Schedule Maintenance Modal -->
+<div class="modal fade" id="scheduleMaintenanceModal" tabindex="-1" aria-labelledby="scheduleMaintenanceModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold" id="scheduleMaintenanceModalLabel"><i class="bi bi-calendar-plus text-primary me-2"></i>Schedule Fleet Asset Maintenance</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form action="/maintenance/add" method="POST" id="schedule-maintenance-form">
+        <div class="modal-body text-start">
+          <div class="row g-3">
+            <!-- Selected Vehicle -->
+            <div class="col-md-6">
+              <label for="vehicle_id" class="form-label small fw-semibold text-dark">Select Vehicle Asset <span class="text-danger">*</span></label>
+              <select class="form-select form-select-sm" id="vehicle_id" name="vehicle_id" required>
+                <option value="" disabled selected>-- Choose Available Vehicle --</option>
+                {% for v in vehicles_list %}
+                  <option value="{{ v.id }}">{{ v.registration_number }} &mdash; {{ v.name }}</option>
+                {% endfor %}
+              </select>
+              <small class="text-secondary d-block mt-1" style="font-size: 0.72rem;">Only active, non-retired and non-On-Trip vehicle assets are eligible.</small>
+            </div>
+
+            <!-- Maintenance Type -->
+            <div class="col-md-6">
+              <label for="maintenance_type" class="form-label small fw-semibold text-dark">Service / Maintenance Type <span class="text-danger">*</span></label>
+              <select class="form-select form-select-sm" id="maintenance_type" name="maintenance_type" required>
+                <option value="" disabled selected>-- Choose Service Type --</option>
+                <option value="Oil Change">Oil Change</option>
+                <option value="Brake Inspection">Brake Inspection</option>
+                <option value="Engine Service">Engine Service</option>
+                <option value="Tyre Replacement">Tyre Replacement</option>
+                <option value="Battery Check">Battery Check</option>
+                <option value="General Service">General Service</option>
+                <option value="AC Service">AC Service</option>
+                <option value="Suspension">Suspension</option>
+                <option value="Electrical">Electrical</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+
+            <!-- Service Center -->
+            <div class="col-md-6">
+              <label for="service_center" class="form-label small fw-semibold text-dark">Service Center / Workshop Name <span class="text-danger">*</span></label>
+              <select class="form-select form-select-sm" id="service_center" name="service_center" required>
+                <option value="" disabled selected>-- Select Indian Service Workshop --</option>
+                <option value="Tata Motors Service Centre">Tata Motors Service Centre</option>
+                <option value="Ashok Leyland Workshop">Ashok Leyland Workshop</option>
+                <option value="Mahindra First Choice">Mahindra First Choice</option>
+                <option value="Bosch Car Service">Bosch Car Service</option>
+                <option value="TVS Vehicle Care">TVS Vehicle Care</option>
+              </select>
+            </div>
+
+            <!-- Technician Name -->
+            <div class="col-md-6">
+              <label for="technician_name" class="form-label small fw-semibold text-dark">Technician Name / Handler</label>
+              <input type="text" class="form-control form-control-sm" id="technician_name" name="technician_name" placeholder="e.g. Ramesh Sharma" required>
+            </div>
+
+            <!-- Scheduled Date -->
+            <div class="col-md-4">
+              <label for="scheduled_date" class="form-label small fw-semibold text-dark">Scheduled Date <span class="text-danger">*</span></label>
+              <input type="date" class="form-control form-control-sm" id="scheduled_date" name="scheduled_date" required min="{{ today_str }}">
+            </div>
+
+            <!-- Estimated Cost -->
+            <div class="col-md-4">
+              <label for="estimated_cost" class="form-label small fw-semibold text-dark">Estimated Cost ($) <span class="text-danger">*</span></label>
+              <div class="input-group input-group-sm">
+                <span class="input-group-text">$</span>
+                <input type="number" class="form-control form-control-sm" id="estimated_cost" name="estimated_cost" min="0" step="0.01" value="0.0" required>
+              </div>
+            </div>
+
+            <!-- Estimated Duration -->
+            <div class="col-md-4">
+              <label for="estimated_duration" class="form-label small fw-semibold text-dark">Est. Duration (Days) <span class="text-danger">*</span></label>
+              <input type="number" class="form-control form-control-sm" id="estimated_duration" name="estimated_duration" min="1" value="1" required>
+            </div>
+
+            <!-- Notes -->
+            <div class="col-12">
+              <label for="notes" class="form-label small fw-semibold text-dark">Special Instructions & Diagnostic Notes</label>
+              <textarea class="form-control form-control-sm" id="notes" name="notes" rows="3" placeholder="Describe symptoms, parts to check, recurring complaints, or standard procedures..."></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm" id="btn-schedule-submit">Schedule Service</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Pre-fill today's date in scheduled_date
+  document.addEventListener('DOMContentLoaded', function() {
+    const dateInput = document.getElementById('scheduled_date');
+    if (dateInput) {
+      const today = new Date().toISOString().split('T')[0];
+      dateInput.value = today;
+      dateInput.min = today;
+    }
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,343 @@
+{% extends 'base.html' %}
+
+{% block title %}Driver Registry - TransitOps{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h2 class="fw-bold text-dark m-0">Driver Registry</h2>
+    <p class="text-secondary small m-0">Manage driver licensing credentials, safety properties, and vehicle assignments</p>
+  </div>
+  <button type="button" class="btn btn-primary d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#addDriverModal" id="btn-add-driver-trigger">
+    <i class="bi bi-plus-lg"></i> Add Driver
+  </button>
+</div>
+
+<!-- KPI Mini-row for Drivers -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm bg-white">
+      <div class="card-body p-3 d-flex align-items-center">
+        <div class="p-2.5 rounded-3 bg-secondary bg-opacity-10 text-secondary me-3">
+          <i class="bi bi-people fs-5"></i>
+        </div>
+        <div>
+          <span class="text-muted small fw-semibold d-block">Active Drivers</span>
+          <h4 class="fw-bold m-0 text-dark" id="kpi-total-drivers">{{ driver_kpis.total }}</h4>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm bg-white">
+      <div class="card-body p-3 d-flex align-items-center">
+        <div class="p-2.5 rounded-3 bg-success bg-opacity-10 text-success me-3">
+          <i class="bi bi-check-circle fs-5"></i>
+        </div>
+        <div>
+          <span class="text-muted small fw-semibold d-block">Available</span>
+          <h4 class="fw-bold m-0 text-dark" id="kpi-available-drivers">{{ driver_kpis.available }}</h4>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm bg-white">
+      <div class="card-body p-3 d-flex align-items-center">
+        <div class="p-2.5 rounded-3 bg-primary bg-opacity-10 text-primary me-3">
+          <i class="bi bi-geo-alt fs-5"></i>
+        </div>
+        <div>
+          <span class="text-muted small fw-semibold d-block">On Trip</span>
+          <h4 class="fw-bold m-0 text-dark" id="kpi-on-trip-drivers">{{ driver_kpis.on_trip }}</h4>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm bg-white">
+      <div class="card-body p-3 d-flex align-items-center">
+        <div class="p-2.5 rounded-3 bg-warning bg-opacity-10 text-warning me-3">
+          <i class="bi bi-calendar-event fs-5"></i>
+        </div>
+        <div>
+          <span class="text-muted small fw-semibold d-block">Off Duty</span>
+          <h4 class="fw-bold m-0 text-dark" id="kpi-on-leave-drivers">{{ driver_kpis.off_duty }}</h4>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Search & Filtering -->
+<div class="card border-0 shadow-sm mb-4 rounded-3">
+  <div class="card-body p-3">
+    <form method="GET" action="/drivers" class="row g-2" id="driver-search-form">
+      <!-- Search Input -->
+      <div class="col-md-3">
+        <div class="input-group input-group-sm">
+          <span class="input-group-text bg-white text-secondary border-end-0"><i class="bi bi-search"></i></span>
+          <input type="text" class="form-control border-start-0" id="search_query" name="q" value="{{ q }}" placeholder="Name, EMP-ID, License, Phone...">
+        </div>
+      </div>
+
+      <!-- Filter: Status -->
+      <div class="col-md-2">
+        <select class="form-select form-select-sm" id="filter_status" name="status" onchange="this.form.submit()">
+          <option value="">All Statuses (Excl. Suspended)</option>
+          <option value="Available" {% if status == 'Available' %}selected{% endif %}>Available</option>
+          <option value="On Trip" {% if status == 'On Trip' %}selected{% endif %}>On Trip</option>
+          <option value="Off Duty" {% if status == 'Off Duty' %}selected{% endif %}>Off Duty</option>
+          <option value="Suspended" {% if status == 'Suspended' %}selected{% endif %}>Suspended</option>
+          <option value="ALL_INCLUDING_SUSPENDED" {% if status == 'ALL_INCLUDING_SUSPENDED' %}selected{% endif %}>Show All (Incl. Suspended)</option>
+        </select>
+      </div>
+
+      <!-- Filter: Region -->
+      <div class="col-md-1.5 col-sm-6">
+        <select class="form-select form-select-sm" id="filter_region" name="region" onchange="this.form.submit()">
+          <option value="">All Regions</option>
+          <option value="North" {% if region == 'North' %}selected{% endif %}>North</option>
+          <option value="South" {% if region == 'South' %}selected{% endif %}>South</option>
+          <option value="East" {% if region == 'East' %}selected{% endif %}>East</option>
+          <option value="West" {% if region == 'West' %}selected{% endif %}>West</option>
+          <option value="Central" {% if region == 'Central' %}selected{% endif %}>Central</option>
+        </select>
+      </div>
+
+      <!-- Filter: License Type -->
+      <div class="col-md-1.5 col-sm-6">
+        <select class="form-select form-select-sm" id="filter_license_type" name="license_type" onchange="this.form.submit()">
+          <option value="">All Licenses</option>
+          <option value="LMV" {% if license_type == 'LMV' %}selected{% endif %}>LMV</option>
+          <option value="HMV" {% if license_type == 'HMV' %}selected{% endif %}>HMV</option>
+          <option value="Heavy Commercial" {% if license_type == 'Heavy Commercial' %}selected{% endif %}>Heavy Commercial</option>
+          <option value="Trailer" {% if license_type == 'Trailer' %}selected{% endif %}>Trailer</option>
+        </select>
+      </div>
+
+      <!-- Filter: Assigned status -->
+      <div class="col-md-1.5 col-sm-6">
+        <select class="form-select form-select-sm" id="filter_assigned" name="assigned" onchange="this.form.submit()">
+          <option value="">Assignment State</option>
+          <option value="assigned" {% if assigned == 'assigned' %}selected{% endif %}>Assigned Vehicle</option>
+          <option value="unassigned" {% if assigned == 'unassigned' %}selected{% endif %}>Unassigned</option>
+        </select>
+      </div>
+
+      <!-- Sorting Column -->
+      <div class="col-md-1.5 col-sm-6">
+        <select class="form-select form-select-sm" id="sort_by" name="sort_by" onchange="this.form.submit()">
+          <option value="name" {% if sort_by == 'name' %}selected{% endif %}>Sort: Full Name</option>
+          <option value="date_joined" {% if sort_by == 'date_joined' %}selected{% endif %}>Sort: Joining Date</option>
+          <option value="region" {% if sort_by == 'region' %}selected{% endif %}>Sort: Region</option>
+          <option value="status" {% if sort_by == 'status' %}selected{% endif %}>Sort: Status</option>
+        </select>
+      </div>
+
+      <!-- Sorting Order -->
+      <div class="col-md-1 col-sm-6">
+        <select class="form-select form-select-sm" id="sort_order" name="sort_order" onchange="this.form.submit()">
+          <option value="asc" {% if sort_order == 'asc' %}selected{% endif %}>Asc</option>
+          <option value="desc" {% if sort_order == 'desc' %}selected{% endif %}>Desc</option>
+        </select>
+      </div>
+
+      <!-- Actions buttons -->
+      <div class="col-md-1.5 d-flex gap-1 ms-auto">
+        <button type="submit" class="btn btn-primary btn-sm flex-grow-1" id="btn-apply-filters">Search</button>
+        <a href="/drivers" class="btn btn-outline-secondary btn-sm" id="btn-reset-filters" title="Reset Filters"><i class="bi bi-arrow-counterclockwise"></i></a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Driver List Table -->
+<div class="card border-0 shadow-sm rounded-3">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle m-0" id="table-drivers">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-4">Employee ID</th>
+            <th>Full Name</th>
+            <th>License No / Type</th>
+            <th>Phone Number</th>
+            <th>Region</th>
+            <th>Assigned Vehicle</th>
+            <th>Status</th>
+            <th class="text-center pe-4" style="width: 150px;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for d in drivers %}
+          <tr>
+            <td class="ps-4">
+              <a href="/drivers/{{ d.id }}" class="fw-bold text-decoration-none text-primary" id="driver-link-{{ d.id }}">
+                {{ d.employee_id or '--' }}
+              </a>
+            </td>
+            <td>
+              <div class="fw-semibold text-dark">{{ d.name }}</div>
+              <div class="text-muted small" style="font-size: 0.75rem;">Joined: {{ d.date_joined or 'N/A' }}</div>
+            </td>
+            <td>
+              <div class="fw-medium text-dark">{{ d.license_number }}</div>
+              <span class="badge bg-light text-secondary border" style="font-size: 0.7rem;">{{ d.license_category }}</span>
+            </td>
+            <td class="text-secondary fw-medium small">{{ d.contact_number }}</td>
+            <td>{{ d.region }}</td>
+            <td>
+              {% if d.assigned_vehicle_id %}
+                <a href="/vehicles/{{ d.assigned_vehicle_id }}" class="badge bg-info-subtle text-info border border-info-subtle text-decoration-none" id="driver-vehicle-badge-{{ d.id }}">
+                  <i class="bi bi-truck me-1"></i>{{ d.vehicle_reg }}
+                </a>
+              {% else %}
+                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">Unassigned</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if d.status == 'Available' %}
+                <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill">Available</span>
+              {% elif d.status == 'On Trip' %}
+                <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill">On Trip</span>
+              {% elif d.status == 'Off Duty' %}
+                <span class="badge bg-warning-subtle text-warning border border-warning-subtle rounded-pill">Off Duty</span>
+              {% else %}
+                <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill">Suspended</span>
+              {% endif %}
+            </td>
+            <td class="text-center pe-4">
+              <div class="d-inline-flex gap-2">
+                <a href="/drivers/{{ d.id }}" class="btn btn-outline-secondary btn-sm p-1 px-2" title="Details" id="btn-details-{{ d.id }}">
+                  <i class="bi bi-eye"></i>
+                </a>
+                <a href="/drivers/edit/{{ d.id }}" class="btn btn-outline-primary btn-sm p-1 px-2" title="Edit" id="btn-edit-{{ d.id }}">
+                  <i class="bi bi-pencil"></i>
+                </a>
+                {% if d.status != 'Suspended' %}
+                <form action="/drivers/delete/{{ d.id }}" method="POST" onsubmit="return confirm('Are you sure you want to deactivate driver {{ d.name }}? This removes active vehicle assignment and makes them Suspended.')" class="m-0" id="form-delete-{{ d.id }}">
+                  <button type="submit" class="btn btn-outline-danger btn-sm p-1 px-2" title="Deactivate Driver" id="btn-delete-submit-{{ d.id }}">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="8" class="text-center py-5 text-muted">
+              <i class="bi bi-person-slash fs-2 d-block mb-3 text-secondary bg-opacity-10"></i>
+              No drivers found matching the search criteria.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Add Driver Modal -->
+<div class="modal fade" id="addDriverModal" tabindex="-1" aria-labelledby="addDriverModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header bg-dark text-white">
+        <h5 class="modal-title fw-bold" id="addDriverModalLabel">Register New Fleet Driver</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form action="/drivers/add" method="POST" id="form-add-driver">
+        <div class="modal-body p-4">
+          <div class="row g-3">
+            <div class="col-md-12">
+              <label for="name" class="form-label text-secondary small fw-semibold mb-1">Full Name *</label>
+              <input type="text" class="form-control" id="name" name="name" placeholder="e.g. John Doe" required>
+            </div>
+            
+            <div class="col-md-6">
+              <label for="employee_id" class="form-label text-secondary small fw-semibold mb-1">Employee ID (Unique) *</label>
+              <input type="text" class="form-control" id="employee_id" name="employee_id" placeholder="e.g. EMP-101" required>
+            </div>
+
+            <div class="col-md-6">
+              <label for="license_number" class="form-label text-secondary small fw-semibold mb-1">License Number (Unique) *</label>
+              <input type="text" class="form-control" id="license_number" name="license_number" placeholder="e.g. LIC-9284" required>
+            </div>
+
+            <div class="col-md-6">
+              <label for="license_type" class="form-label text-secondary small fw-semibold mb-1">License Type</label>
+              <select class="form-select" id="license_type" name="license_type" required>
+                <option value="LMV">LMV</option>
+                <option value="HMV">HMV</option>
+                <option value="Heavy Commercial">Heavy Commercial</option>
+                <option value="Trailer">Trailer</option>
+              </select>
+            </div>
+
+            <div class="col-md-6">
+              <label for="license_expiry_date" class="form-label text-secondary small fw-semibold mb-1">License Expiry Date</label>
+              <input type="date" class="form-control" id="license_expiry_date" name="license_expiry_date" value="2028-12-31">
+            </div>
+
+            <div class="col-md-6">
+              <label for="contact_number" class="form-label text-secondary small fw-semibold mb-1">Phone Number (Digits only) *</label>
+              <input type="text" class="form-control" id="contact_number" name="contact_number" placeholder="e.g. 5550101" required>
+            </div>
+
+            <div class="col-md-6">
+              <label for="email" class="form-label text-secondary small fw-semibold mb-1">Email Address</label>
+              <input type="email" class="form-control" id="email" name="email" placeholder="e.g. john@example.com">
+            </div>
+
+            <div class="col-md-12">
+              <label for="address" class="form-label text-secondary small fw-semibold mb-1">Physical Address</label>
+              <input type="text" class="form-control" id="address" name="address" placeholder="e.g. 123 Main St, Springfield">
+            </div>
+
+            <div class="col-md-6">
+              <label for="region" class="form-label text-secondary small fw-semibold mb-1">Operating Region</label>
+              <select class="form-select" id="region" name="region" required>
+                <option value="North">North</option>
+                <option value="South">South</option>
+                <option value="East">East</option>
+                <option value="West">West</option>
+                <option value="Central">Central</option>
+              </select>
+            </div>
+
+            <div class="col-md-6">
+              <label for="date_joined" class="form-label text-secondary small fw-semibold mb-1">Date Joined</label>
+              <input type="date" class="form-control" id="date_joined" name="date_joined" value="2026-07-11">
+            </div>
+
+            <div class="col-md-6">
+              <label for="status" class="form-label text-secondary small fw-semibold mb-1">Employment Status</label>
+              <select class="form-select" id="status" name="status" required>
+                <option value="Available">Available</option>
+                <option value="On Trip">On Trip</option>
+                <option value="Off Duty">Off Duty</option>
+                <option value="Suspended">Suspended</option>
+              </select>
+            </div>
+
+            <div class="col-md-6">
+              <label for="assigned_vehicle_id" class="form-label text-secondary small fw-semibold mb-1">Assign Vehicle (Optional)</label>
+              <select class="form-select" id="assigned_vehicle_id" name="assigned_vehicle_id">
+                <option value="">No Vehicle Assigned</option>
+                {% for veh in available_vehicles %}
+                <option value="{{ veh.id }}">{{ veh.registration_number }} - {{ veh.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer bg-light">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+          <button type="submit" class="btn btn-primary" id="btn-save-driver">Register Driver</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

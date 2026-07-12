@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>TransitOps Fleet Management - Printed Report</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            font-size: 12px;
+            color: #333;
+            background: #fff;
+            padding: 30px;
+        }
+        .header-print {
+            border-bottom: 3px double #ddd;
+            padding-bottom: 15px;
+            margin-bottom: 30px;
+        }
+        .section-title {
+            font-size: 14px;
+            font-weight: bold;
+            text-transform: uppercase;
+            border-bottom: 1px solid #333;
+            padding-bottom: 5px;
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f5f5f5 !important;
+            font-weight: bold;
+        }
+        @media print {
+            body {
+                padding: 0;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .page-break {
+                page-break-before: always;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="no-print mb-4 text-end">
+        <button onclick="window.print()" class="btn btn-primary btn-sm">🖨️ Send to Printer</button>
+        <button onclick="window.close()" class="btn btn-secondary btn-sm">Close Window</button>
+    </div>
+
+    <div class="header-print text-center">
+        <h2>TransitOps Fleet Operations Command Center</h2>
+        <p class="text-muted mb-1">Official Executive &amp; Operations Activity Log Report</p>
+        <p class="text-muted small">Generated on: <span id="gen-date"></span></p>
+    </div>
+
+    {% if report_type == 'all' or report_type == 'vehicle' %}
+    <div>
+        <div class="section-title">Active Fleet Vehicles ({{ vehicles|length }} Vehicles)</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Reg Number</th>
+                    <th>Vehicle Name</th>
+                    <th>Type</th>
+                    <th>Capacity</th>
+                    <th>Odometer</th>
+                    <th>Acquisition Cost</th>
+                    <th>Status</th>
+                    <th>Region</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for v in vehicles %}
+                <tr>
+                    <td><strong>{{ v.registration_number }}</strong></td>
+                    <td>{{ v.name }}</td>
+                    <td>{{ v.type }}</td>
+                    <td>{{ v.max_load_capacity }} kg</td>
+                    <td>{{ "{:,}".format(v.odometer) }} km</td>
+                    <td>₹{{ "{:,.2f}".format(v.acquisition_cost) }}</td>
+                    <td><span class="badge bg-secondary text-dark">{{ v.status }}</span></td>
+                    <td>{{ v.region }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    {% if report_type == 'all' or report_type == 'driver' %}
+    <div class="{% if report_type == 'all' %}page-break{% endif %}">
+        <div class="section-title">Driver Directory &amp; Performance</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>License Class</th>
+                    <th>Expiry Date</th>
+                    <th>Contact</th>
+                    <th>Safety Score</th>
+                    <th>Status</th>
+                    <th>Region</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for d in drivers %}
+                <tr>
+                    <td>{{ d.employee_id }}</td>
+                    <td><strong>{{ d.name }}</strong></td>
+                    <td>{{ d.license_category }}</td>
+                    <td>{{ d.license_expiry_date }}</td>
+                    <td>{{ d.contact_number }}</td>
+                    <td><strong>{{ d.safety_score }}/100</strong></td>
+                    <td>{{ d.status }}</td>
+                    <td>{{ d.region }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    {% if report_type == 'all' or report_type == 'trip' %}
+    <div class="{% if report_type == 'all' %}page-break{% endif %}">
+        <div class="section-title">Recent Trips &amp; Routes Executed</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Trip ID</th>
+                    <th>Route</th>
+                    <th>Vehicle</th>
+                    <th>Driver</th>
+                    <th>Cargo Weight</th>
+                    <th>Distance</th>
+                    <th>Revenue</th>
+                    <th>Status</th>
+                    <th>Dispatch Date</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in trips %}
+                <tr>
+                    <td>TRP-{{ t.id }}</td>
+                    <td><strong>{{ t.source }} ➔ {{ t.destination }}</strong></td>
+                    <td>{{ t.vehicle_reg }}</td>
+                    <td>{{ t.driver_name }}</td>
+                    <td>{{ t.cargo_weight }} kg</td>
+                    <td>{{ t.planned_distance }} km</td>
+                    <td>₹{{ "{:,.2f}".format(t.revenue) }}</td>
+                    <td>{{ t.status }}</td>
+                    <td>{{ t.dispatch_date }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    {% if report_type == 'all' or report_type == 'fuel' %}
+    <div class="{% if report_type == 'all' %}page-break{% endif %}">
+        <div class="section-title">Fuel Purchase Ledger</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Log ID</th>
+                    <th>Vehicle</th>
+                    <th>Fuel Type</th>
+                    <th>Station</th>
+                    <th>Liters</th>
+                    <th>Price/L</th>
+                    <th>Total Cost</th>
+                    <th>Odometer</th>
+                    <th>Refill Date</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for f in fuel %}
+                <tr>
+                    <td>FL-{{ f.id }}</td>
+                    <td><strong>{{ f.vehicle_reg }}</strong></td>
+                    <td>{{ f.fuel_type }}</td>
+                    <td>{{ f.fuel_station }}</td>
+                    <td>{{ f.liters }} L</td>
+                    <td>₹{{ "{:,.2f}".format(f.price_per_liter) }}</td>
+                    <td><strong>₹{{ "{:,.2f}".format(f.cost) }}</strong></td>
+                    <td>{{ "{:,}".format(f.odometer) }} km</td>
+                    <td>{{ f.date }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    {% if report_type == 'all' or report_type == 'maintenance' %}
+    <div class="{% if report_type == 'all' %}page-break{% endif %}">
+        <div class="section-title">Maintenance &amp; Repairs Audit Trail</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Maint ID</th>
+                    <th>Vehicle</th>
+                    <th>Type</th>
+                    <th>Service Center</th>
+                    <th>Scheduled Date</th>
+                    <th>Completed Date</th>
+                    <th>Actual Cost</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in maintenance %}
+                <tr>
+                    <td>MNT-{{ m.id }}</td>
+                    <td><strong>{{ m.vehicle_reg }}</strong></td>
+                    <td>{{ m.maintenance_type }}</td>
+                    <td>{{ m.service_center }}</td>
+                    <td>{{ m.scheduled_date }}</td>
+                    <td>{{ m.completed_date or 'N/A' }}</td>
+                    <td><strong>₹{{ "{:,.2f}".format(m.actual_cost or 0.0) }}</strong></td>
+                    <td>{{ m.status }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    {% if report_type == 'all' or report_type == 'expense' %}
+    <div class="{% if report_type == 'all' %}page-break{% endif %}">
+        <div class="section-title">Consolidated Financial Expenses</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Exp ID</th>
+                    <th>Vehicle</th>
+                    <th>Category</th>
+                    <th>Amount</th>
+                    <th>GST Amount</th>
+                    <th>Total Amount</th>
+                    <th>Vendor</th>
+                    <th>Payment Method</th>
+                    <th>Date</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for e in expenses %}
+                <tr>
+                    <td>EXP-{{ e.id }}</td>
+                    <td><strong>{{ e.vehicle_reg }}</strong></td>
+                    <td>{{ e.type }}</td>
+                    <td>₹{{ "{:,.2f}".format(e.amount) }}</td>
+                    <td>₹{{ "{:,.2f}".format(e.gst_amount) }}</td>
+                    <td><strong>₹{{ "{:,.2f}".format(e.total_amount) }}</strong></td>
+                    <td>{{ e.vendor }}</td>
+                    <td>{{ e.payment_method }}</td>
+                    <td>{{ e.date }}</td>
+                    <td>{{ e.status }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    <div class="mt-5 text-center small text-muted">
+        <p>TransitOps Operations Command Center — End of Generated Report Document.</p>
+    </div>
+
+    <script>
+        document.getElementById('gen-date').textContent = new Date().toLocaleString();
+    </script>
+</body>
+</html>

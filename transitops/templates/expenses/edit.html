@@ -1,0 +1,202 @@
+{% extends 'base.html' %}
+
+{% block title %}Edit Expense EXP-{{ expense.id }} - TransitOps{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+  <h2 class="fw-bold text-dark m-0">Edit Expense Record: EXP-{{ expense.id }}</h2>
+  <p class="text-secondary small m-0">Modify, re-verify, or cancel existing fleet operational costs and tax distributions</p>
+</div>
+
+<div class="card border-0 shadow-sm rounded-3">
+  <form action="/expenses/edit/{{ expense.id }}" method="POST" id="form-edit-expense" class="needs-validation" novalidate>
+    <div class="card-header bg-dark text-white py-3">
+      <h5 class="card-title fw-bold m-0"><i class="bi bi-pencil-square me-2"></i>Expense Modification Form</h5>
+    </div>
+    <div class="card-body p-4">
+      <div class="row g-3">
+        <!-- Category Selection -->
+        <div class="col-md-6">
+          <label for="edit-category" class="form-label text-secondary small fw-semibold">Expense Category <span class="text-danger">*</span></label>
+          <select class="form-select" id="edit-category" name="category" required>
+            {% for cat in categories %}
+              <option value="{{ cat }}" {% if expense.type == cat %}selected{% endif %}>{{ cat }}</option>
+            {% endfor %}
+          </select>
+          <div class="invalid-feedback">Please select a valid category.</div>
+        </div>
+
+        <!-- Vehicle Selection -->
+        <div class="col-md-6">
+          <label for="edit-vehicle" class="form-label text-secondary small fw-semibold">Vehicle Asset <span class="text-danger">*</span></label>
+          <select class="form-select" id="edit-vehicle" name="vehicle_id" required>
+            {% for v in vehicles %}
+              <option value="{{ v.id }}" {% if expense.vehicle_id == v.id %}selected{% endif %}>{{ v.registration_number }} ({{ v.name }})</option>
+            {% endfor %}
+          </select>
+          <div class="invalid-feedback">Please select a vehicle asset.</div>
+        </div>
+
+        <!-- Driver Selection (Optional) -->
+        <div class="col-md-6">
+          <label for="edit-driver" class="form-label text-secondary small fw-semibold">Driver (Optional)</label>
+          <select class="form-select" id="edit-driver" name="driver_id">
+            <option value="">No Driver</option>
+            {% for d in drivers %}
+              <option value="{{ d.id }}" {% if expense.driver_id == d.id %}selected{% endif %}>{{ d.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Related Trip Selection (Optional) -->
+        <div class="col-md-6">
+          <label for="edit-trip" class="form-label text-secondary small fw-semibold">Related Trip (Optional)</label>
+          <select class="form-select" id="edit-trip" name="trip_id">
+            <option value="">No Related Trip</option>
+            {% for t in trips %}
+              <option value="{{ t.id }}" {% if expense.trip_id == t.id %}selected{% endif %}>TRP-{{ t.id }}: {{ t.source }} to {{ t.destination }} ({{ t.dispatch_date }})</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Expense Date -->
+        <div class="col-md-6">
+          <label for="edit-date" class="form-label text-secondary small fw-semibold">Expense Date <span class="text-danger">*</span></label>
+          <input type="date" class="form-control" id="edit-date" name="date" required value="{{ expense.date }}" max="{{ today_str }}">
+          <div class="invalid-feedback">Please specify a date (cannot be in the future).</div>
+        </div>
+
+        <!-- Vendor / Payee -->
+        <div class="col-md-6">
+          <label for="edit-vendor" class="form-label text-secondary small fw-semibold">Vendor / Payee</label>
+          <input type="text" class="form-control" id="edit-vendor" name="vendor" value="{{ expense.vendor or '' }}" placeholder="e.g., MRF Tyres, HP Petrol Pump">
+        </div>
+
+        <!-- Base Amount -->
+        <div class="col-md-4">
+          <label for="edit-amount" class="form-label text-secondary small fw-semibold">Base Amount (₹) <span class="text-danger">*</span></label>
+          <div class="input-group">
+            <span class="input-group-text">₹</span>
+            <input type="number" class="form-control" id="edit-amount" name="amount" step="0.01" min="0.01" required value="{{ expense.amount }}" placeholder="0.00">
+            <div class="invalid-feedback">Please enter a valid amount greater than zero.</div>
+          </div>
+        </div>
+
+        <!-- GST Percent -->
+        <div class="col-md-4">
+          <label for="edit-gst-percent" class="form-label text-secondary small fw-semibold">GST Rate (%)</label>
+          <div class="input-group">
+            <input type="number" class="form-control" id="edit-gst-percent" name="gst_percent" step="0.1" min="0" value="{{ expense.gst_percent }}" placeholder="0">
+            <span class="input-group-text">%</span>
+            <div class="invalid-feedback">GST cannot be negative.</div>
+          </div>
+        </div>
+
+        <!-- Calculated GST Amount -->
+        <div class="col-md-4">
+          <label for="edit-gst-amount" class="form-label text-secondary small fw-semibold">Calculated GST (₹)</label>
+          <div class="input-group">
+            <span class="input-group-text">₹</span>
+            <input type="text" class="form-control bg-light" id="edit-gst-amount" readonly value="{{ expense.gst_amount }}">
+          </div>
+        </div>
+
+        <!-- Calculated Total Amount -->
+        <div class="col-md-6">
+          <label for="edit-total-amount" class="form-label text-secondary small fw-semibold">Total Cost (₹ - Auto calculated)</label>
+          <div class="input-group">
+            <span class="input-group-text fw-semibold bg-light">₹</span>
+            <input type="text" class="form-control bg-light fw-bold text-primary" id="edit-total-amount" readonly value="{{ expense.total_amount }}">
+          </div>
+        </div>
+
+        <!-- Payment Method -->
+        <div class="col-md-6">
+          <label for="edit-payment-method" class="form-label text-secondary small fw-semibold">Payment Method <span class="text-danger">*</span></label>
+          <select class="form-select" id="edit-payment-method" name="payment_method" required>
+            <option value="Cash" {% if expense.payment_method == 'Cash' %}selected{% endif %}>Cash</option>
+            <option value="UPI" {% if expense.payment_method == 'UPI' %}selected{% endif %}>UPI</option>
+            <option value="Bank Transfer" {% if expense.payment_method == 'Bank Transfer' %}selected{% endif %}>Bank Transfer</option>
+            <option value="Company Card" {% if expense.payment_method == 'Company Card' %}selected{% endif %}>Company Card</option>
+            <option value="Cheque" {% if expense.payment_method == 'Cheque' %}selected{% endif %}>Cheque</option>
+          </select>
+          <div class="invalid-feedback">Please select a payment method.</div>
+        </div>
+
+        <!-- Payment Status -->
+        <div class="col-md-6">
+          <label for="edit-status" class="form-label text-secondary small fw-semibold">Payment Status <span class="text-danger">*</span></label>
+          <select class="form-select" id="edit-status" name="status" required>
+            <option value="Paid" {% if expense.status == 'Paid' %}selected{% endif %}>Paid</option>
+            <option value="Pending" {% if expense.status == 'Pending' %}selected{% endif %}>Pending</option>
+            <option value="Cancelled" {% if expense.status == 'Cancelled' %}selected{% endif %}>Cancelled</option>
+          </select>
+          <div class="invalid-feedback">Please select payment status.</div>
+        </div>
+
+        <!-- Attachment Filename -->
+        <div class="col-md-6">
+          <label for="edit-attachment" class="form-label text-secondary small fw-semibold">Receipt Attachment Filename</label>
+          <input type="text" class="form-control" id="edit-attachment" name="attachment" value="{{ expense.attachment or '' }}" placeholder="e.g., invoice_4901.pdf">
+        </div>
+
+        <!-- Remarks -->
+        <div class="col-12">
+          <label for="edit-remarks" class="form-label text-secondary small fw-semibold">Remarks / Description</label>
+          <textarea class="form-control" id="edit-remarks" name="remarks" rows="3" placeholder="Provide additional details about the expense...">{{ expense.remarks or '' }}</textarea>
+        </div>
+      </div>
+    </div>
+    <div class="card-footer bg-light py-3 d-flex justify-content-between">
+      <a href="/expenses/details/{{ expense.id }}" class="btn btn-outline-secondary">Discard Changes</a>
+      <button type="submit" class="btn btn-dark" id="btn-save-expense">Save Modified Record</button>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Client-side GST auto calculation
+    const amountInput = document.getElementById('edit-amount');
+    const gstPercentInput = document.getElementById('edit-gst-percent');
+    const gstAmountInput = document.getElementById('edit-gst-amount');
+    const totalAmountInput = document.getElementById('edit-total-amount');
+
+    function calculateGST() {
+        const amount = parseFloat(amountInput.value) || 0;
+        const gstPercent = parseFloat(gstPercentInput.value) || 0;
+        const gstAmount = (amount * gstPercent) / 100;
+        const totalAmount = amount + gstAmount;
+
+        gstAmountInput.value = gstAmount.toFixed(2);
+        totalAmountInput.value = totalAmount.toFixed(2);
+    }
+
+    if (amountInput && gstPercentInput) {
+        amountInput.addEventListener('input', calculateGST);
+        gstPercentInput.addEventListener('input', calculateGST);
+        // Fire once on load to populate correctly
+        calculateGST();
+    }
+
+    // Set max date limit to today
+    const dateInput = document.getElementById('edit-date');
+    if (dateInput) {
+        const today = new Date().toISOString().split('T')[0];
+        dateInput.max = today;
+    }
+
+    // Bootstrap validation trigger
+    const form = document.getElementById('form-edit-expense');
+    form.addEventListener('submit', function(event) {
+        if (!form.checkValidity()) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        form.classList.add('was-validated');
+    }, false);
+});
+</script>
+{% endblock %}

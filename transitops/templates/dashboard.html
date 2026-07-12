@@ -1,0 +1,1148 @@
+{% extends 'base.html' %}
+
+{% block title %}Fleet Operations Command Center - TransitOps{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* Premium Dashboard Styling */
+  .dashboard-container {
+    background-color: #f8fafc;
+    padding-bottom: 3rem;
+  }
+  
+  .bento-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03), 0 1px 2px rgba(15, 23, 42, 0.01);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .bento-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 15px -3px rgba(15, 23, 42, 0.08), 0 4px 6px -4px rgba(15, 23, 42, 0.04);
+  }
+
+  .bento-header {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #64748b;
+  }
+
+  .bento-stat {
+    font-size: 2rem;
+    font-weight: 800;
+    line-height: 1.1;
+    color: #0f172a;
+    font-family: var(--font-mono), monospace;
+  }
+
+  .accent-bar {
+    height: 4px;
+    width: 40px;
+    border-radius: 10px;
+    margin-top: 6px;
+    margin-bottom: 12px;
+  }
+
+  .bg-primary-accent { background-color: #3b82f6; }
+  .bg-success-accent { background-color: #10b981; }
+  .bg-warning-accent { background-color: #f59e0b; }
+  .bg-danger-accent  { background-color: #ef4444; }
+  .bg-dark-accent    { background-color: #1e293b; }
+
+  /* Sub-indicators formatting */
+  .sub-indicator {
+    font-size: 0.8125rem;
+    color: #475569;
+  }
+
+  /* List group styling */
+  .analytics-item {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #f1f5f9;
+    transition: background-color 0.15s;
+  }
+  .analytics-item:hover {
+    background-color: #f8fafc;
+  }
+  .analytics-item:last-child {
+    border-bottom: none;
+  }
+
+  /* Custom table styling */
+  .table-premium {
+    font-size: 0.875rem;
+  }
+  .table-premium th {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #475569;
+    background-color: #f8fafc !important;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .table-premium td {
+    padding: 0.875rem 0.75rem;
+    color: #334155;
+  }
+
+  /* Custom Nav Tabs for compact alerts */
+  .nav-alerts .nav-link {
+    color: #64748b;
+    font-weight: 600;
+    font-size: 0.8125rem;
+    padding: 0.6rem 1rem;
+    border: none;
+    border-bottom: 2px solid transparent;
+  }
+  .nav-alerts .nav-link.active {
+    color: #0f172a;
+    background: transparent;
+    border-bottom: 2px solid #3b82f6;
+  }
+
+  .scrollable-alerts {
+    max-height: 250px;
+    overflow-y: auto;
+  }
+
+  /* Custom scrollbar */
+  .scrollable-alerts::-webkit-scrollbar {
+    width: 5px;
+  }
+  .scrollable-alerts::-webkit-scrollbar-track {
+    background: #f1f5f9;
+  }
+  .scrollable-alerts::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+  }
+
+  .badge-status {
+    font-weight: 600;
+    padding: 0.35em 0.75em;
+    border-radius: 6px;
+    font-size: 0.75rem;
+  }
+
+  .btn-filter-clear {
+    transition: all 0.2s;
+  }
+  .btn-filter-clear:hover {
+    background-color: #f1f5f9;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+  {% if session.get('user_role') == 'Driver' %}
+  <!-- DRIVER COMPANION PORTAL -->
+  <div class="container-fluid py-4">
+    <div class="row g-4 mb-4">
+      <!-- Driver Welcome Header -->
+      <div class="col-12">
+        <div class="card border-0 shadow-sm rounded-4 text-white p-4" style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);">
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <div>
+              <span class="badge bg-primary mb-2 fw-bold px-3 py-1.5" style="letter-spacing: 0.5px; font-size: 0.7rem;">DRIVER COMPANION PORTAL</span>
+              <h2 class="fw-bold m-0 text-white">Welcome Back, {{ session.get('user_name') }}!</h2>
+              <p class="mb-0 text-slate-300 small">View your active assignments, update trip statuses, and track your safety metrics in real-time.</p>
+            </div>
+            <div class="bg-white bg-opacity-10 px-4 py-3 rounded-3 text-center border border-white border-opacity-10">
+              <div class="small text-white-50 font-mono text-uppercase mb-1" style="font-size: 10px; letter-spacing: 0.05em;">SYSTEM IST TIME</div>
+              <div class="fw-bold font-mono fs-5 text-white" id="driver-utc-time">2026-07-12 07:00:00</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {% if driver_profile %}
+      <!-- Driver Profile Info Card -->
+      <div class="col-lg-4">
+        <div class="bento-card p-4 h-100">
+          <div class="bento-header d-flex align-items-center mb-3">
+            <i class="bi bi-person-badge-fill me-2 text-primary"></i>My Driver Profile
+          </div>
+          <div class="d-flex align-items-center gap-3 mb-4">
+            <div class="bg-primary bg-opacity-10 text-primary p-3 rounded-circle d-flex align-items-center justify-content-center" style="width: 52px; height: 52px;">
+              <i class="bi bi-person fs-4"></i>
+            </div>
+            <div>
+              <h5 class="fw-bold m-0 text-dark">{{ driver_profile.name }}</h5>
+              <span class="text-secondary small font-mono">ID: {{ driver_profile.employee_id }}</span>
+            </div>
+          </div>
+          <hr class="text-muted opacity-25 my-3">
+          <div class="vstack gap-2 small">
+            <div class="d-flex justify-content-between">
+              <span class="text-secondary">Duty Status:</span>
+              <span class="badge-status {% if driver_profile.status == 'Available' %}bg-success-subtle text-success{% elif driver_profile.status == 'On Trip' %}bg-primary-subtle text-primary{% else %}bg-secondary-subtle text-secondary{% endif %}">
+                {{ driver_profile.status }}
+              </span>
+            </div>
+            <div class="d-flex justify-content-between">
+              <span class="text-secondary">License No:</span>
+              <span class="fw-bold font-mono text-dark">{{ driver_profile.license_number }}</span>
+            </div>
+            <div class="d-flex justify-content-between">
+              <span class="text-secondary">Category:</span>
+              <span class="fw-bold text-dark">{{ driver_profile.license_category }}</span>
+            </div>
+            <div class="d-flex justify-content-between">
+              <span class="text-secondary">Expiry Date:</span>
+              <span class="fw-bold text-dark">{{ driver_profile.license_expiry_date }}</span>
+            </div>
+            <div class="d-flex justify-content-between">
+              <span class="text-secondary">Operating Region:</span>
+              <span class="fw-bold text-dark">{{ driver_profile.region }}</span>
+            </div>
+          </div>
+          <div class="mt-4">
+            <a href="/drivers/{{ driver_profile.id }}" class="btn btn-outline-primary btn-sm w-100 fw-semibold py-2">
+              <i class="bi bi-eye me-1"></i> Open Detailed Profile
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Assigned Vehicle Specs Card -->
+      <div class="col-lg-4">
+        <div class="bento-card p-4 h-100">
+          <div class="bento-header d-flex align-items-center mb-3">
+            <i class="bi bi-truck me-2 text-primary"></i>Assigned Vehicle
+          </div>
+          {% if driver_vehicle %}
+          <div class="d-flex align-items-center gap-3 mb-4">
+            <div class="bg-primary bg-opacity-10 text-primary p-3 rounded-circle d-flex align-items-center justify-content-center" style="width: 52px; height: 52px;">
+              <i class="bi bi-truck fs-4"></i>
+            </div>
+            <div>
+              <h5 class="fw-bold m-0 text-dark">{{ driver_vehicle.name }}</h5>
+              <span class="badge bg-secondary-subtle text-secondary font-mono">{{ driver_vehicle.registration_number }}</span>
+            </div>
+          </div>
+          <hr class="text-muted opacity-25 my-3">
+          <div class="vstack gap-2 small">
+            <div class="d-flex justify-content-between">
+              <span class="text-secondary">Vehicle Status:</span>
+              <span class="badge-status {% if driver_vehicle.status == 'Available' %}bg-success-subtle text-success{% elif driver_vehicle.status == 'On Trip' %}bg-primary-subtle text-primary{% else %}bg-secondary-subtle text-secondary{% endif %}">
+                {{ driver_vehicle.status }}
+              </span>
+            </div>
+            <div class="d-flex justify-content-between">
+              <span class="text-secondary">Classification:</span>
+              <span class="fw-bold text-dark">{{ driver_vehicle.type }}</span>
+            </div>
+            <div class="d-flex justify-content-between">
+              <span class="text-secondary">Odometer Reading:</span>
+              <span class="fw-bold font-mono text-dark">{{ "{:,}".format(driver_vehicle.odometer) }} km</span>
+            </div>
+            <div class="d-flex justify-content-between">
+              <span class="text-secondary">Max Capacity Limit:</span>
+              <span class="fw-bold text-dark">{{ "{:,}".format(driver_vehicle.max_load_capacity) }} kg</span>
+            </div>
+            <div class="d-flex justify-content-between">
+              <span class="text-secondary">Service Region:</span>
+              <span class="fw-bold text-dark">{{ driver_vehicle.region }}</span>
+            </div>
+          </div>
+          <div class="mt-4">
+            <a href="/vehicles/{{ driver_vehicle.id }}" class="btn btn-outline-primary btn-sm w-100 fw-semibold py-2">
+              <i class="bi bi-eye me-1"></i> View Vehicle Health Page
+            </a>
+          </div>
+          {% else %}
+          <div class="text-center py-5 text-secondary">
+            <i class="bi bi-exclamation-circle fs-1 d-block mb-3 text-warning"></i>
+            <h6 class="fw-bold text-dark">No Vehicle Assigned</h6>
+            <span class="small d-block text-muted px-3">Contact your Fleet Manager to assign a vehicle to your profile.</span>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Safety & Trips Metrics Card -->
+      <div class="col-lg-4">
+        <div class="bento-card p-4 h-100 d-flex flex-column justify-content-between">
+          <div>
+            <div class="bento-header d-flex align-items-center mb-3">
+              <i class="bi bi-speedometer2 me-2 text-success"></i>Performance &amp; Safety
+            </div>
+            <div class="text-center py-2">
+              <div class="fs-1 fw-bold text-success font-mono m-0" style="font-size: 3.5rem !important;">{{ driver_profile.safety_score }}<span class="fs-6 text-muted font-sans">/100</span></div>
+              <div class="text-secondary small fw-bold text-uppercase mt-1" style="font-size: 11px; letter-spacing: 0.5px;">Safety Score Index</div>
+              <p class="text-muted small mt-3 px-2">Keep up the great work! Safe driving habits protect your team, cargo, and community while boosting your performance rating.</p>
+            </div>
+          </div>
+          <div class="bg-light p-3 rounded-3 small">
+            <div class="d-flex justify-content-between mb-2">
+              <span class="text-secondary">Total Runs Assigned:</span>
+              <span class="fw-bold text-dark font-mono">{{ driver_trips|length }}</span>
+            </div>
+            <div class="d-flex justify-content-between">
+              <span class="text-secondary">Active Assignments:</span>
+              <span class="fw-bold text-primary font-mono">
+                {% set active_count = namespace(value=0) %}
+                {% for t in driver_trips %}
+                  {% if t.status in ('Scheduled', 'In Progress', 'Dispatched') %}
+                    {% set active_count.value = active_count.value + 1 %}
+                  {% endif %}
+                {% endfor %}
+                {{ active_count.value }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Assigned Trips Table -->
+      <div class="col-12">
+        <div class="bento-card">
+          <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center px-4">
+            <h6 class="fw-bold m-0 text-dark d-flex align-items-center"><i class="bi bi-map-fill me-2 text-primary"></i>My Assigned Trip Schedules</h6>
+            <a href="/trips" class="btn btn-primary btn-sm px-3 fw-bold"><i class="bi-file-earmark-bar-graph me-1"></i> Open My Trips Page</a>
+          </div>
+          <div class="p-0">
+            <div class="table-responsive">
+              <table class="table table-premium table-hover align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th class="ps-4">Trip ID</th>
+                    <th>Source Origin</th>
+                    <th>Destination</th>
+                    <th>Cargo Weight</th>
+                    <th>Planned Distance</th>
+                    <th>Operational Status</th>
+                    <th class="text-end pe-4">Direct Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% if driver_trips %}
+                    {% for trip in driver_trips %}
+                      <tr>
+                        <td class="ps-4 fw-bold text-primary font-mono">TRIP-{{ trip.id }}</td>
+                        <td><span class="badge bg-secondary bg-opacity-10 text-dark px-2.5 py-1.5">{{ trip.source }}</span></td>
+                        <td><span class="badge bg-primary bg-opacity-10 text-primary px-2.5 py-1.5">{{ trip.destination }}</span></td>
+                        <td class="font-mono text-dark">{{ "{:,}".format(trip.cargo_weight) }} kg</td>
+                        <td class="font-mono text-dark">{{ trip.planned_distance }} km</td>
+                        <td>
+                          <span class="badge-status {% if trip.status == 'Scheduled' %}bg-warning-subtle text-warning{% elif trip.status in ('In Progress', 'Dispatched') %}bg-primary-subtle text-primary{% elif trip.status == 'Completed' %}bg-success-subtle text-success{% else %}bg-secondary-subtle text-secondary{% endif %}">
+                            {{ trip.status }}
+                          </span>
+                        </td>
+                        <td class="text-end pe-4">
+                          {% if trip.status in ('Scheduled', 'Draft') %}
+                            <form action="/trips/start/{{ trip.id }}" method="POST" class="d-inline">
+                              <button type="submit" class="btn btn-success btn-sm px-3 fw-bold">
+                                <i class="bi bi-play-fill me-1"></i> Start Trip
+                              </button>
+                            </form>
+                          {% elif trip.status in ('In Progress', 'Dispatched') %}
+                            {% if trip.destination and trip.destination|trim %}
+                              <a href="https://www.google.com/maps/dir/?api=1&destination={{ trip.destination|urlencode }}&travelmode=driving" target="_blank" rel="noopener noreferrer" class="btn btn-outline-info btn-sm px-3 fw-bold d-inline-flex align-items-center me-2" id="btn-navigate-{{ trip.id }}">
+                                <i class="bi bi-geo-alt-fill me-1"></i> NAVIGATE
+                              </a>
+                            {% else %}
+                              <button type="button" class="btn btn-outline-secondary btn-sm px-3 fw-bold d-inline-flex align-items-center me-2" disabled id="btn-navigate-disabled-{{ trip.id }}">
+                                <i class="bi bi-geo-alt-fill me-1"></i> Destination unavailable.
+                              </button>
+                            {% endif %}
+
+                            <button type="button" class="btn btn-primary btn-sm px-3 fw-bold" data-bs-toggle="modal" data-bs-target="#completeTripModal-{{ trip.id }}">
+                              <i class="bi bi-check-circle-fill me-1"></i> Complete Trip
+                            </button>
+
+                            <!-- Complete Trip Modal -->
+                            <div class="modal fade" id="completeTripModal-{{ trip.id }}" tabindex="-1" aria-labelledby="completeTripModalLabel-{{ trip.id }}" aria-hidden="true">
+                              <div class="modal-dialog modal-dialog-centered text-start">
+                                <div class="modal-content">
+                                  <form action="/trips/complete/{{ trip.id }}" method="POST">
+                                    <div class="modal-header">
+                                      <h5 class="modal-title fw-bold text-dark" id="completeTripModalLabel-{{ trip.id }}">Complete Trip TRIP-{{ trip.id }}</h5>
+                                      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body text-dark">
+                                      <p class="mb-3">Confirm completion of trip from <strong class="text-primary">{{ trip.source }}</strong> to <strong class="text-primary">{{ trip.destination }}</strong>.</p>
+                                      <div class="mb-3">
+                                        <label class="form-label text-secondary small fw-bold">Actual Completion Date & Time (Leave blank for current time)</label>
+                                        <input type="datetime-local" class="form-control" name="actual_return">
+                                      </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                      <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                                      <button type="submit" class="btn btn-success btn-sm fw-bold px-3">Confirm Completion</button>
+                                    </div>
+                                  </form>
+                                </div>
+                              </div>
+                            </div>
+                          {% else %}
+                            <span class="text-muted small">-</span>
+                          {% endif %}
+                        </td>
+                      </tr>
+                    {% endfor %}
+                  {% else %}
+                    <tr>
+                      <td colspan="7" class="text-center py-5 text-secondary">
+                      <i class="bi bi-info-circle fs-3 d-block mb-2 text-muted"></i>
+                      No trips are assigned to you currently.
+                    </td>
+                    </tr>
+                  {% endif %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% else %}
+      <div class="col-12">
+        <div class="card border-0 p-5 text-center bg-white shadow-sm rounded-4">
+          <i class="bi bi-exclamation-triangle text-warning fs-1 mb-3"></i>
+          <h4 class="fw-bold text-dark">No Driver Profile Connected</h4>
+          <p class="text-secondary mb-0">Your logged-in email is not currently matched with a driver record in the operations registry.</p>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {% else %}
+  <!-- FLEET MANAGER / COMMAND CENTER VIEW -->
+  <div class="container-fluid py-4 px-4">
+    <!-- Header Command Bar -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3 bg-white p-3 rounded-4 shadow-sm border border-light">
+      <div>
+        <h3 class="fw-bold text-dark m-0 d-flex align-items-center"><i class="bi bi-cpu text-primary me-2.5"></i>Fleet Operations Command Center</h3>
+        <p class="text-secondary small m-0 mt-0.5">Live Business Intelligence and Real-Time Operational Directives</p>
+      </div>
+      <div class="d-flex align-items-center gap-3">
+        <div class="bg-light px-3 py-1.5 rounded-3 border border-gray-100 text-secondary small font-mono d-flex align-items-center gap-2">
+          <span class="position-relative d-inline-flex" style="width: 8px; height: 8px;">
+            <span class="animate-ping position-absolute inline-flex h-full w-full rounded-full bg-danger opacity-75"></span>
+            <span class="position-relative inline-flex rounded-full h-2 w-2 bg-danger"></span>
+          </span>
+          IST TIME: <strong class="text-dark" id="current-utc-time">2026-07-12 07:00:00</strong>
+        </div>
+        <a href="/reports" class="btn btn-primary btn-sm px-3 fw-bold d-flex align-items-center gap-1.5 py-1.5"><i class="bi bi-file-earmark-bar-graph"></i> BI Center</a>
+      </div>
+    </div>
+
+    <!-- Restructured Section 1: Metrics Command Deck (Bento KPI Grid) -->
+    <div class="row g-4 mb-4">
+      
+      <!-- Card 1: Fleet Asset Pool -->
+      <div class="col-xl-3 col-md-6">
+        <div class="bento-card p-4 h-100 d-flex flex-column justify-content-between">
+          <div>
+            <div class="d-flex justify-content-between align-items-center">
+              <span class="bento-header">Fleet Assets</span>
+              <div class="p-2 bg-primary bg-opacity-10 text-primary rounded-3"><i class="bi bi-truck fs-5"></i></div>
+            </div>
+            <div class="bento-stat mt-2">{{ kpis.total_vehicles }}</div>
+            <div class="accent-bar bg-primary-accent"></div>
+            
+            <!-- Multi-segment distribution bar -->
+            <div class="progress mb-3" style="height: 6px;">
+              {% set total_v = kpis.available_vehicles + kpis.on_trip_vehicles + kpis.in_maintenance %}
+              {% if total_v > 0 %}
+                <div class="progress-bar bg-success" style="width: {{ (kpis.available_vehicles / total_v * 100)|int }}%"></div>
+                <div class="progress-bar bg-primary" style="width: {{ (kpis.on_trip_vehicles / total_v * 100)|int }}%"></div>
+                <div class="progress-bar bg-danger" style="width: {{ (kpis.in_maintenance / total_v * 100)|int }}%"></div>
+              {% else %}
+                <div class="progress-bar bg-secondary" style="width: 100%"></div>
+              {% endif %}
+            </div>
+            
+            <div class="vstack gap-1.5 small text-secondary">
+              <div class="d-flex justify-content-between">
+                <span>🟢 Ready / Available:</span>
+                <strong class="text-dark font-mono">{{ kpis.available_vehicles }}</strong>
+              </div>
+              <div class="d-flex justify-content-between">
+                <span>🔵 Active On Trip:</span>
+                <strong class="text-dark font-mono">{{ kpis.on_trip_vehicles }}</strong>
+              </div>
+              <div class="d-flex justify-content-between">
+                <span>🔴 In Maintenance:</span>
+                <strong class="text-dark font-mono">{{ kpis.in_maintenance }}</strong>
+              </div>
+            </div>
+          </div>
+          <div class="pt-3 border-top border-light mt-3 d-flex justify-content-between align-items-center">
+            <span class="text-xs text-secondary">Utilization Rate</span>
+            <span class="badge bg-success-subtle text-success font-mono">{{ "%.1f"|format(kpis.utilization_rate) }}%</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 2: Driver Roster Status -->
+      <div class="col-xl-3 col-md-6">
+        <div class="bento-card p-4 h-100 d-flex flex-column justify-content-between">
+          <div>
+            <div class="d-flex justify-content-between align-items-center">
+              <span class="bento-header">Driver Crew</span>
+              <div class="p-2 bg-success bg-opacity-10 text-success rounded-3"><i class="bi bi-people fs-5"></i></div>
+            </div>
+            <div class="bento-stat mt-2">{{ kpis.total_drivers }}</div>
+            <div class="accent-bar bg-success-accent"></div>
+            
+            <div class="vstack gap-2 small text-secondary">
+              <div class="d-flex justify-content-between align-items-center">
+                <span>🟢 Duty Ready:</span>
+                <span class="badge bg-success-subtle text-success font-mono">{{ kpis.drivers_available }}</span>
+              </div>
+              <div class="d-flex justify-content-between align-items-center">
+                <span>🔵 On Road Trip:</span>
+                <span class="badge bg-primary-subtle text-primary font-mono">{{ kpis.drivers_on_trip }}</span>
+              </div>
+              <div class="d-flex justify-content-between align-items-center">
+                <span>🟡 Off Duty:</span>
+                <span class="badge bg-warning-subtle text-warning font-mono">{{ kpis.drivers_off_duty }}</span>
+              </div>
+              <div class="d-flex justify-content-between align-items-center">
+                <span>⚫ Suspended:</span>
+                <span class="badge bg-secondary-subtle text-secondary font-mono">{{ kpis.drivers_suspended }}</span>
+              </div>
+            </div>
+          </div>
+          <div class="pt-3 border-top border-light mt-3 d-flex justify-content-between align-items-center">
+            <span class="text-xs text-secondary">Drivers Active On Duty</span>
+            <span class="badge bg-dark text-white font-mono">{{ kpis.drivers_on_duty }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3: Financial Overhead Command -->
+      <div class="col-xl-3 col-md-6">
+        <div class="bento-card p-4 h-100 d-flex flex-column justify-content-between">
+          <div>
+            <div class="d-flex justify-content-between align-items-center">
+              <span class="bento-header">Operating Spend</span>
+              <div class="p-2 bg-warning bg-opacity-10 text-warning-emphasis rounded-3"><i class="bi bi-cash-coin fs-5"></i></div>
+            </div>
+            <div class="bento-stat mt-2 text-dark" style="font-size: 1.6rem;">₹{{ "{:,.0f}".format(kpis.monthly_operating_expense) }}</div>
+            <div class="accent-bar bg-warning-accent"></div>
+            
+            <div class="vstack gap-2.5 small text-secondary mt-1">
+              <div class="d-flex justify-content-between">
+                <span>⛽ Fuel Expenditure:</span>
+                <strong class="text-dark font-mono">₹{{ "{:,.0f}".format(kpis.monthly_fuel_spend) }}</strong>
+              </div>
+              <div class="d-flex justify-content-between">
+                <span>🛠️ Repair Repairs:</span>
+                <strong class="text-dark font-mono">₹{{ "{:,.0f}".format(kpis.monthly_maintenance_cost) }}</strong>
+              </div>
+            </div>
+          </div>
+          <div class="pt-3 border-top border-light mt-3 d-flex justify-content-between align-items-center">
+            <span class="text-xs text-secondary">Avg Operating Cost/KM</span>
+            <span class="text-primary fw-bold font-mono">₹{{ "%.2f"|format(financial_analytics.operating_cost_per_km) }}/km</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 4: Dispatch Performance -->
+      <div class="col-xl-3 col-md-6">
+        <div class="bento-card p-4 h-100 d-flex flex-column justify-content-between">
+          <div>
+            <div class="d-flex justify-content-between align-items-center">
+              <span class="bento-header">Dispatch Velocity</span>
+              <div class="p-2 bg-dark bg-opacity-10 text-dark rounded-3"><i class="bi bi-speedometer fs-5"></i></div>
+            </div>
+            <div class="bento-stat mt-2 text-dark">{{ kpis.completed_trips }} <span class="fs-6 text-muted font-sans font-normal">runs</span></div>
+            <div class="accent-bar bg-dark-accent"></div>
+            
+            <div class="vstack gap-2.5 small text-secondary">
+              <div class="d-flex justify-content-between">
+                <span>🔄 In Progress:</span>
+                <strong class="text-primary font-mono">{{ kpis.active_trips }}</strong>
+              </div>
+              <div class="d-flex justify-content-between">
+                <span>⏳ Pending Drafts:</span>
+                <strong class="text-warning font-mono">{{ kpis.pending_trips }}</strong>
+              </div>
+              <div class="d-flex justify-content-between">
+                <span>⚡ Fleet Fuel Efficiency:</span>
+                <strong class="text-success font-mono">{{ "%.2f"|format(kpis.avg_fuel_efficiency) }} km/L</strong>
+              </div>
+            </div>
+          </div>
+          <div class="pt-3 border-top border-light mt-3 d-flex justify-content-between align-items-center">
+            <span class="text-xs text-secondary">Distance Served</span>
+            <span class="badge bg-secondary-subtle text-dark font-mono">{{ "{:,.0f}".format(kpis.total_distance_travelled) }} km</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Restructured Section 2: Command Center Charts & Tabbed Alerts Monitor -->
+    <div class="row g-4 mb-4">
+      
+      <!-- Left Column: Interactive Command Trends Chart -->
+      <div class="col-lg-7">
+        <div class="bento-card p-4 h-100">
+          <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+            <div>
+              <h6 class="fw-bold text-dark m-0"><i class="bi bi-graph-up text-primary me-2"></i>Operational cost &amp; Activity Trends</h6>
+              <p class="text-muted text-xs m-0">Click options to toggle dynamic visualizations</p>
+            </div>
+            <div class="btn-group shadow-sm bg-light p-1 rounded-3">
+              <button class="btn btn-sm btn-white text-xs border-0 py-1 px-2.5 active" id="btn-chart-exp" onclick="switchChartTab('expenses', this)">Monthly Expenses</button>
+              <button class="btn btn-sm btn-light text-xs border-0 py-1 px-2.5" id="btn-chart-fuel" onclick="switchChartTab('fuel_maint', this)">Fuel vs Maintenance</button>
+              <button class="btn btn-sm btn-light text-xs border-0 py-1 px-2.5" id="btn-chart-cons" onclick="switchChartTab('consumption', this)">Consumption</button>
+            </div>
+          </div>
+          <div class="chart-container" style="height: 280px; position: relative;">
+            <canvas id="command-center-chart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Tabbed System Health Alerts Console -->
+      <div class="col-lg-5">
+        <div class="bento-card p-4 h-100 d-flex flex-column justify-content-between">
+          <div>
+            <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+              <div>
+                <h6 class="fw-bold text-dark m-0"><i class="bi bi-bell-fill text-danger me-2"></i>System Health Monitor</h6>
+                <p class="text-muted text-xs m-0">Live warnings &amp; maintenance audits</p>
+              </div>
+              <span class="badge bg-danger rounded-pill">{{ alerts|length + fuel_alerts|length }} active</span>
+            </div>
+
+            <!-- Tab Buttons -->
+            <ul class="nav nav-tabs nav-alerts mb-3" id="alertsTab" role="tablist">
+              <li class="nav-item" role="presentation">
+                <button class="nav-link active position-relative" id="maint-tab" data-bs-toggle="tab" data-bs-target="#maint-alerts" type="button" role="tab">
+                  🔧 Maintenance ({{ alerts|length }})
+                  {% if alerts %}
+                    <span class="position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle"></span>
+                  {% endif %}
+                </button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link position-relative" id="fuel-tab" data-bs-toggle="tab" data-bs-target="#fuel-alerts" type="button" role="tab">
+                  ⛽ Fuel Flags ({{ fuel_alerts|length }})
+                  {% if fuel_alerts %}
+                    <span class="position-absolute top-0 start-100 translate-middle p-1 bg-warning border border-light rounded-circle"></span>
+                  {% endif %}
+                </button>
+              </li>
+            </ul>
+
+            <!-- Tab Content -->
+            <div class="tab-content" id="alertsTabContent">
+              <!-- Maintenance Alerts -->
+              <div class="tab-pane fade show active" id="maint-alerts" role="tabpanel">
+                <div class="scrollable-alerts pe-1">
+                  {% if alerts %}
+                    <div class="d-flex flex-column gap-2">
+                      {% for alert in alerts %}
+                      <div class="alert-list-item border-{{ alert.severity }}">
+                        <div class="d-flex justify-content-between align-items-center">
+                          <strong class="text-dark">{{ alert.title }}</strong>
+                          <span class="badge bg-{{ alert.severity }} text-uppercase font-mono text-white" style="font-size: 8px;">{{ alert.type }}</span>
+                        </div>
+                        <div class="text-secondary mt-1" style="font-size: 0.75rem;">
+                          Vehicle: <a href="/vehicles/{{ alert.vehicle_id if alert.vehicle_id else '' }}" class="fw-bold text-primary text-decoration-none">{{ alert.registration_number }}</a> — {{ alert.message }}
+                        </div>
+                      </div>
+                      {% endfor %}
+                    </div>
+                  {% else %}
+                    <div class="text-center py-5 text-muted small">
+                      <i class="bi bi-check-circle-fill text-success fs-3 mb-2 d-block"></i>
+                      All vehicles conform to preventative service intervals.
+                    </div>
+                  {% endif %}
+                </div>
+              </div>
+
+              <!-- Fuel Alerts -->
+              <div class="tab-pane fade" id="fuel-alerts" role="tabpanel">
+                <div class="scrollable-alerts pe-1">
+                  {% if fuel_alerts %}
+                    <div class="d-flex flex-column gap-2">
+                      {% for f_alert in fuel_alerts %}
+                      <div class="alert-list-item border-{{ f_alert.severity }}">
+                        <div class="d-flex justify-content-between align-items-center">
+                          <strong class="text-dark">{{ f_alert.title }}</strong>
+                          <span class="badge bg-{{ f_alert.severity }} text-uppercase font-mono text-white" style="font-size: 8px;">{{ f_alert.type }}</span>
+                        </div>
+                        <div class="text-secondary mt-1" style="font-size: 0.75rem;">
+                          Vehicle: <strong class="text-dark">{{ f_alert.registration_number }}</strong> — {{ f_alert.message }}
+                        </div>
+                      </div>
+                      {% endfor %}
+                    </div>
+                  {% else %}
+                    <div class="text-center py-5 text-muted small">
+                      <i class="bi bi-shield-fill-check text-success fs-3 mb-2 d-block"></i>
+                      Fuel metrics and consumption levels are normal.
+                    </div>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+
+          </div>
+          <div class="pt-3 border-top border-light mt-2 text-end">
+            <a href="/vehicles" class="text-xs text-primary text-decoration-none fw-bold">Open Full Maintenance Ledger <i class="bi bi-arrow-right"></i></a>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Section 3: Deep Operational Analytics (3-Column Leaderboard Bento) -->
+    <div class="row g-4 mb-4">
+      
+      <!-- Column 1: Asset Top Lists -->
+      <div class="col-lg-4 col-md-6">
+        <div class="bento-card h-100">
+          <div class="card-header bg-white py-3 border-bottom border-light px-4">
+            <h6 class="fw-bold text-dark m-0"><i class="bi bi-truck-flatbed text-primary me-2"></i>Asset Intensity Leaderboard</h6>
+          </div>
+          <div class="p-2">
+            <div class="mb-3 p-2">
+              <span class="text-secondary text-xs fw-bold uppercase d-block border-bottom pb-1 mb-2 px-2" style="font-size: 10px; letter-spacing: 0.05em;">🏆 TOP 5 FREQUENT VEHICLES</span>
+              <div class="vstack gap-1">
+                {% for f in top_used_vehicles %}
+                <div class="analytics-item d-flex justify-content-between text-xs align-items-center py-2 px-2 rounded-2">
+                  <span class="fw-semibold text-dark">{{ f.registration_number }} <span class="text-muted fw-normal">({{ f.name }})</span></span>
+                  <span class="badge bg-light text-dark font-mono border">{{ f.trip_count }} Trips</span>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+
+            <div class="mb-3 p-2">
+              <span class="text-secondary text-xs fw-bold uppercase d-block border-bottom pb-1 mb-2 px-2" style="font-size: 10px; letter-spacing: 0.05em;">💸 HIGH MAINTENANCE COST</span>
+              <div class="vstack gap-1">
+                {% for m in top_maint_vehicles %}
+                <div class="analytics-item d-flex justify-content-between text-xs align-items-center py-2 px-2 rounded-2">
+                  <span class="fw-semibold text-dark">{{ m.registration_number }}</span>
+                  <span class="fw-bold text-danger font-mono">₹{{ "{:,.0f}".format(m.total_cost) }}</span>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+
+            <div class="p-2">
+              <span class="text-secondary text-xs fw-bold uppercase d-block border-bottom pb-1 mb-2 px-2" style="font-size: 10px; letter-spacing: 0.05em;">⛽ HEAVY FUEL BURN</span>
+              <div class="vstack gap-1">
+                {% for fc in top_fuel_vehicles %}
+                <div class="analytics-item d-flex justify-content-between text-xs align-items-center py-2 px-2 rounded-2">
+                  <span class="fw-semibold text-dark">{{ fc.registration_number }}</span>
+                  <span class="fw-bold text-dark font-mono">₹{{ "{:,.0f}".format(fc.total_cost) }}</span>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Column 2: Driver Roster leaderboard -->
+      <div class="col-lg-4 col-md-6">
+        <div class="bento-card h-100 d-flex flex-column justify-content-between">
+          <div>
+            <div class="card-header bg-white py-3 border-bottom border-light px-4 d-flex justify-content-between align-items-center">
+              <h6 class="fw-bold text-dark m-0"><i class="bi bi-people-fill text-primary me-2"></i>Driver Safety Ledger</h6>
+              <a href="/drivers" class="text-xs text-primary text-decoration-none fw-bold">View Roster</a>
+            </div>
+            <div class="table-responsive" style="max-height: 420px; overflow-y: auto;">
+              <table class="table table-premium table-hover align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th class="ps-4">Driver</th>
+                    <th>Trips</th>
+                    <th class="text-end pe-4">Safety</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for d in driver_analytics %}
+                  <tr>
+                    <td class="ps-4">
+                      <div class="fw-semibold text-dark">{{ d.name }}</div>
+                      <span class="text-muted text-xs font-mono">{{ d.vehicle_reg or 'No Vehicle' }}</span>
+                    </td>
+                    <td class="font-mono text-secondary" style="font-size: 11px;">{{ d.trips_completed }} completed</td>
+                    <td class="text-end pe-4">
+                      <span class="fw-bold {% if d.safety_score >= 90 %}text-success{% else %}text-warning{% endif %} font-mono">
+                        {{ d.safety_score }}
+                      </span>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="p-3 bg-light rounded-bottom-4 text-center small text-secondary border-top">
+            Safety Scores are derived dynamically from route telematics
+          </div>
+        </div>
+      </div>
+
+      <!-- Column 3: Trip Corridor & Financial Analytics -->
+      <div class="col-lg-4">
+        <div class="bento-card h-100 p-4 d-flex flex-column justify-content-between">
+          <div>
+            <div class="bento-header d-flex align-items-center mb-3">
+              <i class="bi bi-cash-stack text-success me-2"></i>Operational Insights &amp; ROI
+            </div>
+            
+            <div class="vstack gap-2 border-bottom pb-3 mb-3">
+              <div class="d-flex justify-content-between align-items-center">
+                <span class="text-secondary text-xs">Frequent Route Corridor</span>
+                <strong class="text-dark small text-end">{{ trip_analytics.frequent_route }}</strong>
+              </div>
+              <div class="d-flex justify-content-between align-items-center mt-1">
+                <span class="text-secondary text-xs">Longest Route Corridor</span>
+                <strong class="text-dark small text-end">{{ trip_analytics.longest_trip }}</strong>
+              </div>
+              <div class="d-flex justify-content-between align-items-center mt-1">
+                <span class="text-secondary text-xs">Shortest Route Corridor</span>
+                <strong class="text-dark small text-end">{{ trip_analytics.shortest_trip }}</strong>
+              </div>
+              <div class="d-flex justify-content-between align-items-center mt-1">
+                <span class="text-secondary text-xs">Trip Completion Ratio</span>
+                <strong class="text-success font-mono">{{ "%.1f"|format(trip_analytics.completion_rate) }}%</strong>
+              </div>
+            </div>
+
+            <div>
+              <span class="text-secondary text-xs fw-bold uppercase d-block mb-3" style="font-size: 10px; letter-spacing: 0.05em;">💵 CONSOLIDATED OPERATIONAL COSTS</span>
+              <div class="vstack gap-2 text-secondary small">
+                <div class="d-flex justify-content-between">
+                  <span>Cumulative Fuel Spend:</span>
+                  <strong class="font-mono text-dark">₹{{ "{:,.2f}".format(financial_analytics.fuel_cost) }}</strong>
+                </div>
+                <div class="d-flex justify-content-between">
+                  <span>Cumulative Maintenance:</span>
+                  <strong class="font-mono text-dark">₹{{ "{:,.2f}".format(financial_analytics.maint_cost) }}</strong>
+                </div>
+                <div class="d-flex justify-content-between">
+                  <span>Driver Base Salaries:</span>
+                  <strong class="font-mono text-dark">₹{{ "{:,.2f}".format(financial_analytics.driver_salary) }}</strong>
+                </div>
+                <div class="d-flex justify-content-between border-top pt-2 mt-1 border-dashed">
+                  <span>Heavy Expense Source:</span>
+                  <strong class="text-dark">{{ financial_analytics.top_expense_cat }}</strong>
+                </div>
+                <div class="d-flex justify-content-between">
+                  <span>Average Fleet ROI Score:</span>
+                  <strong class="font-mono text-success">{{ roi_metrics.avg_roi }}</strong>
+                </div>
+                <div class="d-flex justify-content-between">
+                  <span>Highest ROI Vehicle:</span>
+                  <strong class="text-success small text-end">{{ roi_metrics.top_vehicle }}</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="pt-3 border-top border-light mt-3">
+            <div class="d-flex justify-content-between align-items-center">
+              <span class="fw-semibold text-xs text-secondary">Fleet Operating Cost/KM</span>
+              <strong class="text-primary font-mono fs-5">₹{{ "%.2f"|format(financial_analytics.operating_cost_per_km) }}/km</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Section 4: Live Active Fleet Registry & Filter Bar -->
+    <div class="bento-card">
+      <div class="card-header bg-white py-3 px-4 d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <div>
+          <h5 class="fw-bold text-dark m-0">Live Active Fleet Registry</h5>
+          <p class="text-secondary text-xs m-0 mt-0.5">Use search and filters below to scope assets list</p>
+        </div>
+        <div class="d-flex gap-2">
+          <div class="input-group input-group-sm" style="max-width: 250px;">
+            <span class="input-group-text bg-light border-end-0 text-muted"><i class="bi bi-search"></i></span>
+            <input type="text" class="form-control bg-light border-start-0 text-xs" id="fleetSearchInput" placeholder="Filter registration, name, type...">
+          </div>
+        </div>
+      </div>
+      
+      <!-- Filters Panel in Dashboard -->
+      <div class="bg-light bg-opacity-50 p-3 border-bottom px-4 border-light">
+        <form method="GET" action="/" class="row g-2 align-items-end">
+          <div class="col-md-3">
+            <label class="text-secondary small fw-bold mb-1" style="font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase;">Vehicle Classification</label>
+            <select class="form-select form-select-sm" name="type" onchange="this.form.submit()">
+              <option value="">All Classifications</option>
+              {% for t in vehicle_types %}
+                <option value="{{ t }}" {% if selected_type == t %}selected{% endif %}>{{ t }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="text-secondary small fw-bold mb-1" style="font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase;">Operational Status</label>
+            <select class="form-select form-select-sm" name="status" onchange="this.form.submit()">
+              <option value="">All Statuses</option>
+              {% for s in vehicle_statuses %}
+                <option value="{{ s }}" {% if selected_status == s %}selected{% endif %}>{{ s }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="text-secondary small fw-bold mb-1" style="font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase;">Operating Region</label>
+            <select class="form-select form-select-sm" name="region" onchange="this.form.submit()">
+              <option value="">All Regions</option>
+              {% for r in vehicle_regions %}
+                <option value="{{ r }}" {% if selected_region == r %}selected{% endif %}>{{ r }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-3">
+            <a href="/" class="btn btn-outline-secondary btn-sm w-100 fw-bold py-1.5 btn-filter-clear d-flex align-items-center justify-content-center gap-1">
+              <i class="bi bi-x-circle"></i> Clear Filters
+            </a>
+          </div>
+        </form>
+      </div>
+
+      <!-- Vehicles Registry Table -->
+      <div class="p-0">
+        <div class="table-responsive">
+          <table class="table table-premium table-hover align-middle mb-0" id="fleet-registry-table">
+            <thead>
+              <tr>
+                <th class="ps-4">Vehicle Registration</th>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Region</th>
+                <th>Odometer</th>
+                <th class="text-end">Return / ROI Rate</th>
+                <th class="text-end pe-4">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for v in vehicles %}
+              <tr>
+                <td class="ps-4 font-mono fw-bold text-primary">{{ v.registration_number }}</td>
+                <td class="fw-semibold text-dark">{{ v.name }}</td>
+                <td><span class="badge bg-light text-dark border">{{ v.type }}</span></td>
+                <td>{{ v.region }}</td>
+                <td class="font-mono text-xs">{{ "{:,}".format(v.odometer) }} km</td>
+                <td class="text-end font-mono fw-bold {% if v.roi < 0 %}text-danger{% else %}text-success{% endif %}">
+                  {{ v.roi_percent }}
+                </td>
+                <td class="text-end pe-4">
+                  {% if v.status == 'Available' %}
+                    <span class="badge-status bg-success-subtle text-success">Available</span>
+                  {% elif v.status == 'On Trip' %}
+                    <span class="badge-status bg-primary-subtle text-primary">On Trip</span>
+                  {% elif v.status == 'In Shop' %}
+                    <span class="badge-status bg-warning-subtle text-warning">In Shop</span>
+                  {% else %}
+                    <span class="badge-status bg-secondary-subtle text-secondary">{{ v.status }}</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="7" class="text-center py-5 text-muted small">No vehicles match the selected filter configuration.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+  {% endif %}
+</div>
+
+<!-- INJECT CHART.JS CDN AND SCRIPTS -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    // 1. Current IST date-time dynamic counter
+    setInterval(() => {
+        const d = new Date();
+        const formatter = new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'Asia/Kolkata',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        });
+        const parts = formatter.formatToParts(d);
+        const year = parts.find(p => p.type === 'year').value;
+        const month = parts.find(p => p.type === 'month').value;
+        const day = parts.find(p => p.type === 'day').value;
+        const hour = parts.find(p => p.type === 'hour').value;
+        const minute = parts.find(p => p.type === 'minute').value;
+        const second = parts.find(p => p.type === 'second').value;
+        const formatted = `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+
+        const normalTimeEl = document.getElementById('current-utc-time');
+        if (normalTimeEl) {
+            normalTimeEl.textContent = formatted;
+        }
+        const driverTimeEl = document.getElementById('driver-utc-time');
+        if (driverTimeEl) {
+            driverTimeEl.textContent = formatted;
+        }
+    }, 1000);
+
+    // 2. Load compiled JSON charts data from flask backend
+    const rawData = JSON.parse('{{ charts_data_json|safe }}');
+    
+    // Monthly Expenses Data
+    const expenseMonths = Object.keys(rawData.monthly_expenses_trend || {});
+    const expenseTotals = Object.values(rawData.monthly_expenses_trend || {});
+
+    // Trips per month
+    const tripsMonths = Object.keys(rawData.trips_per_month || {});
+    const tripsCounts = Object.values(rawData.trips_per_month || {});
+
+    // Fuel vs Maintenance
+    const fuelVal = rawData.fuel_vs_maintenance.Fuel || 0;
+    const maintVal = rawData.fuel_vs_maintenance.Maintenance || 0;
+
+    // Daily Fuel Consumption (30 Days)
+    const fuelDays = Object.keys(rawData.fuel_consumption_trend || {});
+    const fuelLiters = Object.values(rawData.fuel_consumption_trend || {});
+
+    // Define main Chart instance
+    let activeChartInstance = null;
+
+    window.switchChartTab = function(type, element) {
+        // Toggle Active styles on buttons
+        const btnExp = document.getElementById('btn-chart-exp');
+        const btnFuel = document.getElementById('btn-chart-fuel');
+        const btnCons = document.getElementById('btn-chart-cons');
+        
+        if (btnExp) btnExp.classList.remove('active', 'btn-white');
+        if (btnFuel) btnFuel.classList.remove('active', 'btn-white');
+        if (btnCons) btnCons.classList.remove('active', 'btn-white');
+        
+        if (btnExp) btnExp.classList.add('btn-light');
+        if (btnFuel) btnFuel.classList.add('btn-light');
+        if (btnCons) btnCons.classList.add('btn-light');
+
+        if (element) {
+            element.classList.remove('btn-light');
+            element.classList.add('active', 'btn-white');
+        }
+
+        if (activeChartInstance) {
+            activeChartInstance.destroy();
+        }
+
+        const chartCanvas = document.getElementById('command-center-chart');
+        if (!chartCanvas) return;
+        const ctx = chartCanvas.getContext('2d');
+
+        if (type === 'expenses') {
+            activeChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: expenseMonths.length > 0 ? expenseMonths : ["Jul 2026"],
+                    datasets: [{
+                        label: 'Overhead Operational Expense (INR)',
+                        data: expenseTotals.length > 0 ? expenseTotals : [0],
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.08)',
+                        fill: true,
+                        tension: 0.35,
+                        borderWidth: 2,
+                        pointBackgroundColor: '#3b82f6'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { 
+                        y: { beginAtZero: true, grid: { color: '#f1f5f9' } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        } else if (type === 'fuel_maint') {
+            activeChartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Fuel Expenditures', 'Maintenance Repairs'],
+                    datasets: [{
+                        data: [fuelVal, maintVal],
+                        backgroundColor: ['#f59e0b', '#ef4444'],
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 15 } } }
+                }
+            });
+        } else if (type === 'consumption') {
+            activeChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: fuelDays.length > 0 ? fuelDays : ["Refills"],
+                    datasets: [{
+                        label: 'Fuel Refills (Liters)',
+                        data: fuelLiters.length > 0 ? fuelLiters : [0],
+                        backgroundColor: '#10b981',
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { 
+                        y: { beginAtZero: true, grid: { color: '#f1f5f9' } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+    }
+
+    // Default to 'expenses' trend chart
+    if (document.getElementById('command-center-chart')) {
+        switchChartTab('expenses', document.getElementById('btn-chart-exp'));
+    }
+
+    // Live table search scripting
+    const fleetSearch = document.getElementById("fleetSearchInput");
+    if (fleetSearch) {
+        fleetSearch.addEventListener("keyup", function() {
+            const term = this.value.toLowerCase();
+            const rows = document.querySelectorAll("#fleet-registry-table tbody tr");
+            rows.forEach(row => {
+                const rowText = row.innerText.toLowerCase();
+                if (rowText.indexOf(term) > -1) {
+                    row.style.display = "";
+                } else {
+                    row.style.display = "none";
+                }
+            });
+        });
+    }
+});
+</script>
+{% endblock %}

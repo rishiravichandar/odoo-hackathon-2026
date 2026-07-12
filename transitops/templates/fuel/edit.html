@@ -1,0 +1,168 @@
+{% extends 'base.html' %}
+
+{% block title %}Edit Fuel Record FL-{{ log.id }} - TransitOps{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+  <ol class="breadcrumb small">
+    <li class="breadcrumb-item"><a href="/" class="text-decoration-none text-secondary">Dashboard</a></li>
+    <li class="breadcrumb-item"><a href="/fuel" class="text-decoration-none text-secondary">Fuel Center</a></li>
+    <li class="breadcrumb-item"><a href="/fuel/{{ log.id }}" class="text-decoration-none text-secondary">Refill Record FL-{{ log.id }}</a></li>
+    <li class="breadcrumb-item active text-dark" aria-current="page">Edit Receipt</li>
+  </ol>
+</nav>
+
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="card border-0 shadow-sm rounded-3">
+      <div class="card-header bg-white py-3 border-bottom border-light">
+        <h4 class="card-title fw-bold m-0 text-dark d-flex align-items-center gap-2">
+          <i class="bi bi-pencil-square text-primary"></i> Edit Fuel Receipt FL-{{ log.id }}
+        </h4>
+        <p class="text-secondary small m-0 mt-1">Update transactions, correct prices, or edit odometer readings</p>
+      </div>
+      <div class="card-body p-4">
+        <form action="/fuel/edit/{{ log.id }}" method="POST" id="edit-fuel-form">
+          <div class="row g-3">
+            
+            <!-- Vehicle Select (Disabled or Read-Only for consistency, but if they want to edit, we can allow or show a dropdown of active vehicles) -->
+            <div class="col-md-6">
+              <label for="edit_vehicle_id" class="form-label small fw-semibold text-dark">Vehicle Asset <span class="text-danger">*</span></label>
+              <select class="form-select form-select-sm" id="edit_vehicle_id" name="vehicle_id" required>
+                {% for v in vehicles %}
+                  <option value="{{ v.id }}" {% if log.vehicle_id == v.id %}selected{% endif %} data-odometer="{{ v.odometer }}">
+                    {{ v.registration_number }} &mdash; {{ v.name }} [Current Odo: {{ "{:,.0f}".format(v.odometer) }} km]
+                  </option>
+                {% endfor %}
+              </select>
+              <div class="form-text" style="font-size: 0.75rem;">Only active vehicles are recommended for logging fuel.</div>
+            </div>
+
+            <!-- Driver Select -->
+            <div class="col-md-6">
+              <label for="edit_driver_id" class="form-label small fw-semibold text-dark">Driver <span class="text-danger">*</span></label>
+              <select class="form-select form-select-sm" id="edit_driver_id" name="driver_id" required>
+                {% for d in drivers %}
+                  <option value="{{ d.id }}" {% if log.driver_id == d.id %}selected{% endif %}>{{ d.name }} ({{ d.employee_id }})</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <!-- Fuel Type -->
+            <div class="col-md-6">
+              <label for="edit_fuel_type" class="form-label small fw-semibold text-dark">Fuel Type <span class="text-danger">*</span></label>
+              <select class="form-select form-select-sm" id="edit_fuel_type" name="fuel_type" required>
+                <option value="Diesel" {% if log.fuel_type == 'Diesel' %}selected{% endif %}>Diesel</option>
+                <option value="Petrol" {% if log.fuel_type == 'Petrol' %}selected{% endif %}>Petrol</option>
+                <option value="CNG" {% if log.fuel_type == 'CNG' %}selected{% endif %}>CNG</option>
+                <option value="Electric Charging" {% if log.fuel_type == 'Electric Charging' %}selected{% endif %}>Electric Charging</option>
+              </select>
+            </div>
+
+            <!-- Fuel Station -->
+            <div class="col-md-6">
+              <label for="edit_fuel_station" class="form-label small fw-semibold text-dark">Fuel Station <span class="text-danger">*</span></label>
+              <input type="text" class="form-control form-control-sm" id="edit_fuel_station" name="fuel_station" value="{{ log.fuel_station }}" required>
+            </div>
+
+            <!-- Fuel Quantity (Litres) -->
+            <div class="col-md-4">
+              <label for="edit_liters" class="form-label small fw-semibold text-dark">Fuel Quantity (Litres) <span class="text-danger">*</span></label>
+              <input type="number" class="form-control form-control-sm" id="edit_liters" name="liters" min="0.01" step="0.01" value="{{ log.liters }}" required>
+            </div>
+
+            <!-- Price per Litre -->
+            <div class="col-md-4">
+              <label for="edit_price_per_liter" class="form-label small fw-semibold text-dark">Price per Litre (₹) <span class="text-danger">*</span></label>
+              <input type="number" class="form-control form-control-sm" id="edit_price_per_liter" name="price_per_liter" min="0.01" step="0.01" value="{{ log.price_per_liter }}" required>
+            </div>
+
+            <!-- Total Cost (Auto-calculated) -->
+            <div class="col-md-4">
+              <label for="edit_total_cost" class="form-label small fw-semibold text-dark">Total Cost (₹)</label>
+              <div class="input-group input-group-sm">
+                <span class="input-group-text">₹</span>
+                <input type="text" class="form-control form-control-sm bg-light fw-bold text-dark" id="edit_total_cost" value="{{ log.cost }}" readonly>
+              </div>
+              <div class="form-text" style="font-size: 0.72rem; color: #1abc9c;"><i class="bi bi-calculator"></i> Auto-recalculated on changes</div>
+            </div>
+
+            <!-- Current Odometer -->
+            <div class="col-md-6">
+              <label for="edit_odometer" class="form-label small fw-semibold text-dark">Current Odometer Reading (km) <span class="text-danger">*</span></label>
+              <input type="number" class="form-control form-control-sm" id="edit_odometer" name="odometer" min="0" value="{{ log.odometer }}" required>
+              <div class="form-text text-muted" id="edit_odo_helper" style="font-size: 0.75rem;">Keep odometer higher than previous entry to record dynamic mileage.</div>
+            </div>
+
+            <!-- Fuel Date & Time -->
+            <div class="col-md-6">
+              <label for="edit_date" class="form-label small fw-semibold text-dark">Fuel Date &amp; Time <span class="text-danger">*</span></label>
+              <input type="datetime-local" class="form-control form-control-sm" id="edit_date" name="date" value="{{ log.date|replace(' ', 'T') }}" required>
+            </div>
+
+            <!-- Payment Method -->
+            <div class="col-md-6">
+              <label for="edit_payment_method" class="form-label small fw-semibold text-dark">Payment Method <span class="text-danger">*</span></label>
+              <select class="form-select form-select-sm" id="edit_payment_method" name="payment_method" required>
+                <option value="Cash" {% if log.payment_method == 'Cash' %}selected{% endif %}>Cash</option>
+                <option value="UPI" {% if log.payment_method == 'UPI' %}selected{% endif %}>UPI</option>
+                <option value="Credit Card" {% if log.payment_method == 'Credit Card' %}selected{% endif %}>Credit Card</option>
+                <option value="Company Account" {% if log.payment_method == 'Company Account' %}selected{% endif %}>Company Account</option>
+              </select>
+            </div>
+
+            <!-- Remarks -->
+            <div class="col-12">
+              <label for="edit_remarks" class="form-label small fw-semibold text-dark">Remarks / Special Notes</label>
+              <textarea class="form-control form-control-sm" id="edit_remarks" name="remarks" rows="3">{{ log.remarks }}</textarea>
+            </div>
+
+            <!-- Submit and Discard Actions -->
+            <div class="col-12 border-top pt-3 mt-4 d-flex justify-content-between">
+              <a href="/fuel/{{ log.id }}" class="btn btn-outline-secondary btn-sm" id="btn-cancel-edit">Discard Changes</a>
+              <button type="submit" class="btn btn-primary btn-sm" id="btn-submit-edit">Save Changes</button>
+            </div>
+
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Dynamic calculation of total cost
+  const litInput = document.getElementById('edit_liters');
+  const priceInput = document.getElementById('edit_price_per_liter');
+  const totalInput = document.getElementById('edit_total_cost');
+
+  function calculateTotal() {
+    const qty = parseFloat(litInput.value) || 0;
+    const price = parseFloat(priceInput.value) || 0;
+    totalInput.value = (qty * price).toFixed(2);
+  }
+
+  litInput.addEventListener('input', calculateTotal);
+  priceInput.addEventListener('input', calculateTotal);
+
+  // Set minimum limit validation based on selected vehicle
+  const vehicleSelect = document.getElementById('edit_vehicle_id');
+  const odometerInput = document.getElementById('edit_odometer');
+  const odoHelper = document.getElementById('edit_odo_helper');
+
+  function updateOdoLimits() {
+    const selectedOption = vehicleSelect.options[vehicleSelect.selectedIndex];
+    const currentOdo = parseFloat(selectedOption.getAttribute('data-odometer')) || 0;
+    // We let them edit, but set min to vehicle current odo or original log odo
+    const originalLogOdo = parseFloat("{{ log.odometer }}") || 0;
+    // min should be whichever is smaller, so they aren't completely locked from fixing typo
+    const minOdoAllowed = Math.min(currentOdo, originalLogOdo);
+    odometerInput.min = minOdoAllowed;
+    odoHelper.innerHTML = `Minimum odometer reading allowed is <strong>${minOdoAllowed.toLocaleString()} km</strong>.`;
+  }
+
+  vehicleSelect.addEventListener('change', updateOdoLimits);
+  // Run on load
+  document.addEventListener("DOMContentLoaded", updateOdoLimits);
+</script>
+{% endblock %}

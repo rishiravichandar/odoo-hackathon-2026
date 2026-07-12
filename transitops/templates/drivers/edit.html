@@ -1,0 +1,139 @@
+{% extends 'base.html' %}
+
+{% block title %}Edit Driver Details - TransitOps{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="/drivers" class="text-decoration-none">Drivers</a></li>
+      <li class="breadcrumb-item"><a href="/drivers/{{ driver.id }}" class="text-decoration-none">{{ driver.name }}</a></li>
+      <li class="breadcrumb-item active" aria-current="page">Edit Details</li>
+    </ol>
+  </nav>
+  <h2 class="fw-bold text-dark m-0">Edit Driver Profile</h2>
+  <p class="text-secondary small m-0">Modify driver license information, status, and contact info</p>
+</div>
+
+<div class="row">
+  <div class="col-lg-8">
+    <div class="card border-0 shadow-sm rounded-3">
+      <div class="card-header bg-dark text-white p-3">
+        <h5 class="card-title m-0 fw-semibold">Driver Information Profile</h5>
+      </div>
+      <form action="/drivers/edit/{{ driver.id }}" method="POST" id="form-edit-driver">
+        <div class="card-body p-4">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label for="employee_id_display" class="form-label text-secondary small fw-semibold mb-1">Employee ID (Cannot be modified)</label>
+              <input type="text" class="form-control bg-light" id="employee_id_display" value="{{ driver.employee_id }}" readonly disabled>
+            </div>
+            
+            <div class="col-md-6">
+              <label for="name" class="form-label text-secondary small fw-semibold mb-1">Full Name *</label>
+              <input type="text" class="form-control" id="name" name="name" value="{{ driver.name }}" required>
+            </div>
+
+            <div class="col-md-6">
+              <label for="license_number" class="form-label text-secondary small fw-semibold mb-1">License Number (Unique) *</label>
+              <input type="text" class="form-control" id="license_number" name="license_number" value="{{ driver.license_number }}" required>
+            </div>
+
+            <div class="col-md-6">
+              <label for="license_type" class="form-label text-secondary small fw-semibold mb-1">License Type</label>
+              <select class="form-select" id="license_type" name="license_type" required>
+                <option value="LMV" {% if driver.license_category == 'LMV' %}selected{% endif %}>LMV</option>
+                <option value="HMV" {% if driver.license_category == 'HMV' %}selected{% endif %}>HMV</option>
+                <option value="Heavy Commercial" {% if driver.license_category == 'Heavy Commercial' %}selected{% endif %}>Heavy Commercial</option>
+                <option value="Trailer" {% if driver.license_category == 'Trailer' %}selected{% endif %}>Trailer</option>
+              </select>
+            </div>
+
+            <div class="col-md-6">
+              <label for="license_expiry_date" class="form-label text-secondary small fw-semibold mb-1">License Expiry Date</label>
+              <input type="date" class="form-control" id="license_expiry_date" name="license_expiry_date" value="{{ driver.license_expiry_date }}">
+            </div>
+
+            <div class="col-md-6">
+              <label for="contact_number" class="form-label text-secondary small fw-semibold mb-1">Phone Number *</label>
+              <input type="text" class="form-control" id="contact_number" name="contact_number" value="{{ driver.contact_number }}" required>
+            </div>
+
+            <div class="col-md-6">
+              <label for="email" class="form-label text-secondary small fw-semibold mb-1">Email Address</label>
+              <input type="email" class="form-control" id="email" name="email" value="{{ driver.email or '' }}" placeholder="john@example.com">
+            </div>
+
+            <div class="col-md-6">
+              <label for="date_joined" class="form-label text-secondary small fw-semibold mb-1">Date Joined</label>
+              <input type="date" class="form-control" id="date_joined" name="date_joined" value="{{ driver.date_joined }}">
+            </div>
+
+            <div class="col-md-6">
+              <label for="region" class="form-label text-secondary small fw-semibold mb-1">Operating Region</label>
+              <select class="form-select" id="region" name="region" required>
+                <option value="North" {% if driver.region == 'North' %}selected{% endif %}>North</option>
+                <option value="South" {% if driver.region == 'South' %}selected{% endif %}>South</option>
+                <option value="East" {% if driver.region == 'East' %}selected{% endif %}>East</option>
+                <option value="West" {% if driver.region == 'West' %}selected{% endif %}>West</option>
+                <option value="Central" {% if driver.region == 'Central' %}selected{% endif %}>Central</option>
+              </select>
+            </div>
+
+            <div class="col-md-6">
+              <label for="status" class="form-label text-secondary small fw-semibold mb-1">Employment Status</label>
+              <select class="form-select" id="status" name="status" required>
+                <option value="Available" {% if driver.status == 'Available' %}selected{% endif %}>Available</option>
+                <option value="On Trip" {% if driver.status == 'On Trip' %}selected{% endif %}>On Trip</option>
+                <option value="Off Duty" {% if driver.status == 'Off Duty' %}selected{% endif %}>Off Duty</option>
+                <option value="Suspended" {% if driver.status == 'Suspended' %}selected{% endif %}>Suspended</option>
+              </select>
+            </div>
+
+            <div class="col-md-12">
+              <label for="address" class="form-label text-secondary small fw-semibold mb-1">Physical Address</label>
+              <input type="text" class="form-control" id="address" name="address" value="{{ driver.address or '' }}">
+            </div>
+          </div>
+        </div>
+        <div class="card-footer bg-light p-3 d-flex justify-content-between">
+          <a href="/drivers" class="btn btn-outline-secondary">Cancel</a>
+          <button type="submit" class="btn btn-primary" id="btn-save-driver-edit">Save Modifications</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card border-0 shadow-sm bg-light rounded-3 mb-4">
+      <div class="card-body p-4 text-center">
+        <div class="d-inline-flex p-3 rounded-circle bg-primary bg-opacity-10 text-primary mb-3">
+          <i class="bi bi-person-badge fs-1"></i>
+        </div>
+        <h4 class="fw-bold text-dark mb-1">{{ driver.name }}</h4>
+        <p class="text-secondary small mb-3">{{ driver.employee_id }}</p>
+        
+        <hr class="text-secondary opacity-25">
+
+        <div class="text-start">
+          <div class="mb-2 d-flex justify-content-between">
+            <span class="text-secondary small fw-semibold">Status:</span>
+            <span class="badge bg-opacity-10 rounded-pill px-2.5 py-1
+              {% if driver.status == 'Available' %}bg-success text-success{% elif driver.status == 'On Trip' %}bg-primary text-primary{% elif driver.status == 'Off Duty' %}bg-warning text-dark{% else %}bg-danger text-danger{% endif %}">
+              {{ driver.status }}
+            </span>
+          </div>
+          <div class="mb-2 d-flex justify-content-between">
+            <span class="text-secondary small fw-semibold">License Category:</span>
+            <span class="text-dark fw-medium small">{{ driver.license_category }}</span>
+          </div>
+          <div class="mb-2 d-flex justify-content-between">
+            <span class="text-secondary small fw-semibold">Safety Index Score:</span>
+            <span class="text-dark fw-medium small"><i class="bi bi-shield-check text-success me-1"></i>{{ driver.safety_score }}%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

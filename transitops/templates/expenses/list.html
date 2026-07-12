@@ -1,0 +1,768 @@
+{% extends 'base.html' %}
+
+{% block title %}Operational Expenses - TransitOps{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h2 class="fw-bold text-dark m-0">Expense Registry &amp; Management</h2>
+    <p class="text-secondary small m-0">Track and consolidate fleet expenditures, fuel overheads, and driver salaries</p>
+  </div>
+  <button type="button" class="btn btn-primary d-flex align-items-center gap-2 shadow-sm" data-bs-toggle="modal" data-bs-target="#addExpenseModal" id="btn-add-expense">
+    <i class="bi bi-plus-circle"></i> Record Manual Expense
+  </button>
+</div>
+
+<!-- Financial KPI Dashboard -->
+<div class="row g-3 mb-4" id="expense-kpis">
+  <!-- Total Expenses -->
+  <div class="col-12 col-sm-6 col-md-3">
+    <div class="card border-0 shadow-sm bg-white h-100">
+      <div class="card-body p-3 d-flex align-items-center">
+        <div class="p-3 rounded-3 bg-primary bg-opacity-10 text-primary me-3">
+          <i class="bi bi-wallet2 fs-4"></i>
+        </div>
+        <div>
+          <span class="text-muted small fw-semibold d-block">Total Expenses</span>
+          <h4 class="fw-bold m-0 text-dark mt-1" id="kpi-total-spent">₹{{ "{:,.2f}".format(kpis.total_spent) }}</h4>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Monthly Expenses -->
+  <div class="col-12 col-sm-6 col-md-3">
+    <div class="card border-0 shadow-sm bg-white h-100">
+      <div class="card-body p-3 d-flex align-items-center">
+        <div class="p-3 rounded-3 bg-success bg-opacity-10 text-success me-3">
+          <i class="bi bi-calendar-check fs-4"></i>
+        </div>
+        <div>
+          <span class="text-muted small fw-semibold d-block">Monthly Spend</span>
+          <h4 class="fw-bold m-0 text-success mt-1" id="kpi-monthly-spent">₹{{ "{:,.2f}".format(kpis.monthly_spent) }}</h4>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Today's Spend -->
+  <div class="col-12 col-sm-6 col-md-3">
+    <div class="card border-0 shadow-sm bg-white h-100">
+      <div class="card-body p-3 d-flex align-items-center">
+        <div class="p-3 rounded-3 bg-info bg-opacity-10 text-info me-3">
+          <i class="bi bi-clock-history fs-4"></i>
+        </div>
+        <div>
+          <span class="text-muted small fw-semibold d-block">Today's Spend</span>
+          <h4 class="fw-bold m-0 text-dark mt-1" id="kpi-today-spent">₹{{ "{:,.2f}".format(kpis.today_spent) }}</h4>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pending Payments -->
+  <div class="col-12 col-sm-6 col-md-3">
+    <div class="card border-0 shadow-sm bg-white h-100">
+      <div class="card-body p-3 d-flex align-items-center">
+        <div class="p-3 rounded-3 bg-warning bg-opacity-10 text-warning me-3">
+          <i class="bi bi-hourglass-split fs-4"></i>
+        </div>
+        <div>
+          <span class="text-muted small fw-semibold d-block">Pending Payments</span>
+          <h4 class="fw-bold m-0 text-warning mt-1" id="kpi-pending-spent">₹{{ "{:,.2f}".format(kpis.pending_spent) }}</h4>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Paid Expenses -->
+  <div class="col-12 col-sm-6 col-md-4">
+    <div class="card border-0 shadow-sm bg-white h-100">
+      <div class="card-body p-3 d-flex align-items-center">
+        <div class="p-3 rounded-3 bg-teal bg-opacity-10 text-success me-3">
+          <i class="bi bi-check-circle fs-4"></i>
+        </div>
+        <div>
+          <span class="text-muted small fw-semibold d-block">Paid Expenses</span>
+          <h5 class="fw-bold m-0 text-dark mt-1" id="kpi-paid-spent">₹{{ "{:,.2f}".format(kpis.paid_spent) }}</h5>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Highest Category -->
+  <div class="col-12 col-sm-6 col-md-4">
+    <div class="card border-0 shadow-sm bg-white h-100">
+      <div class="card-body p-3 d-flex align-items-center">
+        <div class="p-3 rounded-3 bg-danger bg-opacity-10 text-danger me-3">
+          <i class="bi bi-graph-up fs-4"></i>
+        </div>
+        <div>
+          <span class="text-muted small fw-semibold d-block">Highest Expense Category</span>
+          <h5 class="fw-bold m-0 text-danger mt-1" id="kpi-highest-category" style="font-size: 1rem;">{{ kpis.highest_category }}</h5>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Average Monthly Spend -->
+  <div class="col-12 col-sm-6 col-md-4">
+    <div class="card border-0 shadow-sm bg-white h-100">
+      <div class="card-body p-3 d-flex align-items-center">
+        <div class="p-3 rounded-3 bg-dark bg-opacity-10 text-dark me-3">
+          <i class="bi bi-calculator fs-4"></i>
+        </div>
+        <div>
+          <span class="text-muted small fw-semibold d-block">Avg Monthly Spend</span>
+          <h5 class="fw-bold m-0 text-dark mt-1" id="kpi-avg-monthly">₹{{ "{:,.2f}".format(kpis.avg_monthly_spend) }}</h5>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Nav tabs for switching between Registry and Reports -->
+<ul class="nav nav-pills mb-4" id="expenseTabs" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link active fw-semibold" id="registry-tab" data-bs-toggle="tab" data-bs-target="#registry-pane" type="button" role="tab" aria-controls="registry-pane" aria-selected="true">
+      <i class="bi bi-list-ul me-1"></i> Expense Log &amp; Registry
+    </button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link fw-semibold" id="analytics-tab" data-bs-toggle="tab" data-bs-target="#analytics-pane" type="button" role="tab" aria-controls="analytics-pane" aria-selected="false">
+      <i class="bi bi-bar-chart-line me-1"></i> Analytics &amp; Reports
+    </button>
+  </li>
+</ul>
+
+<div class="tab-content" id="expenseTabContent">
+  <!-- Registry Pane -->
+  <div class="tab-pane fade show active" id="registry-pane" role="tabpanel" aria-labelledby="registry-tab" tabindex="0">
+    <!-- Filters Panel -->
+    <div class="card border-0 shadow-sm rounded-3 mb-4">
+      <div class="card-body p-3">
+        <form method="GET" action="/expenses" class="row g-2 align-items-end" id="expense-filter-form">
+          <!-- Search -->
+          <div class="col-md-3">
+            <label for="search_q" class="form-label text-secondary small fw-semibold mb-1">Search Query</label>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+              <input type="text" class="form-control border-start-0" id="search_q" name="q" value="{{ q_search }}" placeholder="ID, Reg, Vendor, Category, Driver...">
+            </div>
+          </div>
+
+          <!-- Category -->
+          <div class="col-md-2">
+            <label for="filter_category" class="form-label text-secondary small fw-semibold mb-1">Category</label>
+            <select class="form-select form-select-sm" id="filter_category" name="category">
+              <option value="">All Categories</option>
+              {% for cat in categories %}
+                <option value="{{ cat }}" {% if f_category == cat %}selected{% endif %}>{{ cat }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <!-- Vehicle -->
+          <div class="col-md-2">
+            <label for="filter_vehicle" class="form-label text-secondary small fw-semibold mb-1">Vehicle</label>
+            <select class="form-select form-select-sm" id="filter_vehicle" name="vehicle">
+              <option value="">All Vehicles</option>
+              {% for v in vehicles %}
+                <option value="{{ v.id }}" {% if f_vehicle == v.id|string %}selected{% endif %}>{{ v.registration_number }} ({{ v.name }})</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <!-- Driver -->
+          <div class="col-md-2">
+            <label for="filter_driver" class="form-label text-secondary small fw-semibold mb-1">Driver</label>
+            <select class="form-select form-select-sm" id="filter_driver" name="driver">
+              <option value="">All Drivers</option>
+              {% for d in drivers %}
+                <option value="{{ d.id }}" {% if f_driver == d.id|string %}selected{% endif %}>{{ d.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <!-- Status -->
+          <div class="col-md-1.5 col-md-1">
+            <label for="filter_status" class="form-label text-secondary small fw-semibold mb-1">Status</label>
+            <select class="form-select form-select-sm" id="filter_status" name="status">
+              <option value="">All</option>
+              <option value="Paid" {% if f_status == 'Paid' %}selected{% endif %}>Paid</option>
+              <option value="Pending" {% if f_status == 'Pending' %}selected{% endif %}>Pending</option>
+              <option value="Cancelled" {% if f_status == 'Cancelled' %}selected{% endif %}>Cancelled</option>
+            </select>
+          </div>
+
+          <!-- Start Date -->
+          <div class="col-md-2">
+            <label for="filter_start_date" class="form-label text-secondary small fw-semibold mb-1">From Date</label>
+            <input type="date" class="form-control form-control-sm" id="filter_start_date" name="start_date" value="{{ f_start_date }}">
+          </div>
+
+          <!-- End Date -->
+          <div class="col-md-2">
+            <label for="filter_end_date" class="form-label text-secondary small fw-semibold mb-1">To Date</label>
+            <input type="date" class="form-control form-control-sm" id="filter_end_date" name="end_date" value="{{ f_end_date }}">
+          </div>
+
+          <!-- Sort Column -->
+          <div class="col-md-2">
+            <label for="sort" class="form-label text-secondary small fw-semibold mb-1">Sort By</label>
+            <select class="form-select form-select-sm" id="sort" name="sort">
+              <option value="date" {% if sort_by == 'date' %}selected{% endif %}>Date</option>
+              <option value="amount" {% if sort_by == 'amount' %}selected{% endif %}>Total Amount</option>
+              <option value="category" {% if sort_by == 'category' %}selected{% endif %}>Category</option>
+              <option value="vehicle" {% if sort_by == 'vehicle' %}selected{% endif %}>Vehicle</option>
+              <option value="vendor" {% if sort_by == 'vendor' %}selected{% endif %}>Vendor</option>
+            </select>
+          </div>
+
+          <!-- Sort Order -->
+          <div class="col-md-1.5 col-md-1">
+            <label for="order" class="form-label text-secondary small fw-semibold mb-1">Order</label>
+            <select class="form-select form-select-sm" id="order" name="order">
+              <option value="desc" {% if sort_order == 'desc' %}selected{% endif %}>Desc</option>
+              <option value="asc" {% if sort_order == 'asc' %}selected{% endif %}>Asc</option>
+            </select>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="col-md-2 d-flex gap-2">
+            <button type="submit" class="btn btn-sm btn-dark flex-grow-1" id="btn-apply-filters">Filter</button>
+            <a href="/expenses" class="btn btn-sm btn-outline-secondary" id="btn-reset-filters"><i class="bi bi-arrow-counterclockwise"></i></a>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Registry Table -->
+    <div class="card border-0 shadow-sm rounded-3">
+      <div class="card-header bg-white py-3 border-bottom border-light d-flex justify-content-between align-items-center">
+        <h5 class="card-title fw-bold m-0 text-dark">Expenditure Records</h5>
+        <span class="badge bg-light text-dark border">{{ expenses|length }} Records Found</span>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle m-0" id="expenses-table">
+            <thead class="table-light text-secondary small uppercase">
+              <tr>
+                <th class="ps-4">Expense ID</th>
+                <th>Category</th>
+                <th>Vehicle</th>
+                <th>Driver</th>
+                <th>Expense Date</th>
+                <th>Vendor / Payee</th>
+                <th class="text-end">Base (₹)</th>
+                <th class="text-end">GST (₹)</th>
+                <th class="text-end">Total Amount (₹)</th>
+                <th class="text-center">Status</th>
+                <th class="text-end pe-4">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="small">
+              {% for exp in expenses %}
+              <tr id="expense-row-{{ exp.id }}">
+                <td class="ps-4 fw-bold text-dark">
+                  EXP-{{ exp.id }}
+                </td>
+                <td>
+                  {% if exp.type == 'Fuel' %}
+                    <span class="badge bg-success bg-opacity-10 text-success"><i class="bi bi-fuel-pump me-1"></i>Fuel</span>
+                  {% elif exp.type == 'Maintenance' %}
+                    <span class="badge bg-info bg-opacity-10 text-info"><i class="bi bi-wrench me-1"></i>Maintenance</span>
+                  {% elif exp.type == 'Driver Salary' %}
+                    <span class="badge bg-purple bg-opacity-10 text-dark" style="background-color: #f4ecf7; color: #6c3483;"><i class="bi bi-person me-1"></i>Salary</span>
+                  {% elif exp.type == 'Insurance' %}
+                    <span class="badge bg-primary bg-opacity-10 text-primary"><i class="bi bi-shield-check me-1"></i>Insurance</span>
+                  {% elif exp.type == 'Toll Charges' %}
+                    <span class="badge bg-warning bg-opacity-10 text-warning"><i class="bi bi-signpost-split me-1"></i>Toll</span>
+                  {% else %}
+                    <span class="badge bg-secondary bg-opacity-10 text-secondary"><i class="bi bi-hash me-1"></i>{{ exp.type }}</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <div class="fw-semibold text-dark">{{ exp.registration_number }}</div>
+                  <div class="text-muted text-xs">{{ exp.vehicle_name }}</div>
+                </td>
+                <td>
+                  {{ exp.driver_name or '--' }}
+                </td>
+                <td>
+                  {{ exp.date }}
+                </td>
+                <td>
+                  {{ exp.vendor or '--' }}
+                </td>
+                <td class="text-end">
+                  ₹{{ "{:,.2f}".format(exp.amount) }}
+                </td>
+                <td class="text-end text-muted">
+                  {% if exp.gst_amount > 0 %}
+                    ₹{{ "{:,.2f}".format(exp.gst_amount) }} <span class="text-xs">({{ exp.gst_percent }}%)</span>
+                  {% else %}
+                    --
+                  {% endif %}
+                </td>
+                <td class="text-end fw-bold text-dark">
+                  ₹{{ "{:,.2f}".format(exp.total_amount) }}
+                </td>
+                <td class="text-center">
+                  {% if exp.status == 'Paid' %}
+                    <span class="badge bg-success rounded-pill px-2.5">Paid</span>
+                  {% elif exp.status == 'Pending' %}
+                    <span class="badge bg-warning text-dark rounded-pill px-2.5">Pending</span>
+                  {% else %}
+                    <span class="badge bg-secondary rounded-pill px-2.5">Cancelled</span>
+                  {% endif %}
+                </td>
+                <td class="text-end pe-4">
+                  <div class="btn-group btn-group-sm">
+                    <a href="/expenses/details/{{ exp.id }}" class="btn btn-outline-secondary" title="View Details" id="btn-view-{{ exp.id }}">
+                      <i class="bi bi-eye"></i>
+                    </a>
+                    <a href="/expenses/edit/{{ exp.id }}" class="btn btn-outline-dark" title="Edit" id="btn-edit-{{ exp.id }}">
+                      <i class="bi bi-pencil"></i>
+                    </a>
+                    <form action="/expenses/delete/{{ exp.id }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this expense?');">
+                      <button type="submit" class="btn btn-outline-danger" title="Delete" id="btn-delete-{{ exp.id }}">
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="11" class="text-center py-5 text-muted">
+                  <i class="bi bi-inbox fs-2 d-block mb-3"></i>
+                  No expense records found matching the search criteria.
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Analytics Pane -->
+  <div class="tab-pane fade" id="analytics-pane" role="tabpanel" aria-labelledby="analytics-tab" tabindex="0">
+    <!-- Row 1: Charts and Trend metrics -->
+    <div class="row g-4 mb-4">
+      <!-- Category Breakdown -->
+      <div class="col-lg-6">
+        <div class="card border-0 shadow-sm rounded-3 h-100">
+          <div class="card-header bg-white py-3 border-bottom border-light">
+            <h5 class="card-title fw-bold m-0 text-dark">Category-wise Expenditure Breakdown</h5>
+          </div>
+          <div class="card-body p-0">
+            <div class="table-responsive">
+              <table class="table table-hover align-middle m-0" id="table-category-report">
+                <thead class="table-light text-secondary small uppercase">
+                  <tr>
+                    <th class="ps-4">Expense Category</th>
+                    <th class="text-center">Count</th>
+                    <th class="text-end pe-4">Total Spent (₹)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for cat in category_report %}
+                  <tr>
+                    <td class="ps-4 fw-semibold text-dark">{{ cat.category }}</td>
+                    <td class="text-center"><span class="badge bg-secondary rounded-pill px-2.5">{{ cat.count }}</span></td>
+                    <td class="text-end pe-4 fw-bold text-dark">₹{{ "{:,.2f}".format(cat.total) }}</td>
+                  </tr>
+                  {% else %}
+                  <tr>
+                    <td colspan="3" class="text-center py-4 text-muted small">No category statistics available.</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Monthly Trend -->
+      <div class="col-lg-6">
+        <div class="card border-0 shadow-sm rounded-3 h-100">
+          <div class="card-header bg-white py-3 border-bottom border-light">
+            <h5 class="card-title fw-bold m-0 text-dark">Monthly Expenditure Trend</h5>
+          </div>
+          <div class="card-body p-0">
+            <div class="table-responsive">
+              <table class="table table-hover align-middle m-0" id="table-monthly-trend">
+                <thead class="table-light text-secondary small uppercase">
+                  <tr>
+                    <th class="ps-4">Month</th>
+                    <th class="text-center">Transactions</th>
+                    <th class="text-end pe-4">Monthly Total (₹)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for mon in monthly_report %}
+                  <tr>
+                    <td class="ps-4 text-dark fw-medium">{{ mon.month }}</td>
+                    <td class="text-center"><span class="badge bg-secondary rounded-pill px-2.5">{{ mon.count }}</span></td>
+                    <td class="text-end pe-4 fw-bold text-success">₹{{ "{:,.2f}".format(mon.total) }}</td>
+                  </tr>
+                  {% else %}
+                  <tr>
+                    <td colspan="3" class="text-center py-4 text-muted small">No monthly cost trend statistics available.</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 2: Fuel vs Maintenance and Vehicle-specific breakdown -->
+    <div class="row g-4 mb-4">
+      <!-- Fuel vs Maintenance Summary -->
+      <div class="col-lg-4">
+        <div class="card border-0 shadow-sm rounded-3 h-100">
+          <div class="card-header bg-white py-3 border-bottom border-light">
+            <h5 class="card-title fw-bold m-0 text-dark">Fuel vs Maintenance Comparison</h5>
+          </div>
+          <div class="card-body p-4 text-center">
+            <div class="row g-2 mb-4">
+              <div class="col-6 border-end">
+                <div class="text-secondary small mb-1">Fuel Overhead</div>
+                <h4 class="fw-bold text-success">₹{{ "{:,.0f}".format(fuel_vs_maint.fuel_total or 0.0) }}</h4>
+              </div>
+              <div class="col-6">
+                <div class="text-secondary small mb-1">Maintenance Cost</div>
+                <h4 class="fw-bold text-info">₹{{ "{:,.0f}".format(fuel_vs_maint.maint_total or 0.0) }}</h4>
+              </div>
+            </div>
+            
+            <!-- Styled HTML Progress Bar for Visual Comparison -->
+            {% set f_total = fuel_vs_maint.fuel_total or 0.0 %}
+            {% set m_total = fuel_vs_maint.maint_total or 0.0 %}
+            {% set sum_both = f_total + m_total %}
+            {% if sum_both > 0 %}
+              {% set fuel_percent = (f_total / sum_both * 100)|round|int %}
+              {% set maint_percent = (m_total / sum_both * 100)|round|int %}
+            {% else %}
+              {% set fuel_percent = 50 %}
+              {% set maint_percent = 50 %}
+            {% endif %}
+            
+            <span class="text-muted small d-block mb-2">Visual Cost Distribution</span>
+            <div class="progress" style="height: 24px;">
+              <div class="progress-bar bg-success" role="progressbar" style="width: {{ fuel_percent }}%" aria-valuenow="{{ fuel_percent }}" aria-valuemin="0" aria-valuemax="100" title="Fuel ({{ fuel_percent }}%)">
+                {{ fuel_percent }}% Fuel
+              </div>
+              <div class="progress-bar bg-info" role="progressbar" style="width: {{ maint_percent }}%" aria-valuenow="{{ maint_percent }}" aria-valuemin="0" aria-valuemax="100" title="Maintenance ({{ maint_percent }}%)">
+                {{ maint_percent }}% Mnt
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Vehicle Breakdown -->
+      <div class="col-lg-8">
+        <div class="card border-0 shadow-sm rounded-3 h-100">
+          <div class="card-header bg-white py-3 border-bottom border-light">
+            <h5 class="card-title fw-bold m-0 text-dark">Top Spending Vehicles &amp; Asset Burden</h5>
+          </div>
+          <div class="card-body p-0">
+            <div class="table-responsive">
+              <table class="table table-hover align-middle m-0" id="table-vehicle-spending">
+                <thead class="table-light text-secondary small uppercase">
+                  <tr>
+                    <th class="ps-4">Vehicle Registration</th>
+                    <th>Model Name</th>
+                    <th class="text-center">Bills</th>
+                    <th class="text-end pe-4">Cumulative Overhead (₹)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for v in vehicle_report %}
+                  <tr>
+                    <td class="ps-4 fw-semibold text-dark">{{ v.registration_number }}</td>
+                    <td class="text-muted">{{ v.name }}</td>
+                    <td class="text-center"><span class="badge bg-secondary rounded-pill px-2.5">{{ v.count }}</span></td>
+                    <td class="text-end pe-4 fw-bold text-dark">₹{{ "{:,.2f}".format(v.total) }}</td>
+                  </tr>
+                  {% else %}
+                  <tr>
+                    <td colspan="4" class="text-center py-4 text-muted small">No asset spend details available.</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 3: Top 5 Highest Expenses -->
+    <div class="card border-0 shadow-sm rounded-3">
+      <div class="card-header bg-white py-3 border-bottom border-light">
+        <h5 class="card-title fw-bold m-0 text-dark">Top 5 Highest Operational Expenses</h5>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle m-0" id="table-top-5-expenses">
+            <thead class="table-light text-secondary small uppercase">
+              <tr>
+                <th class="ps-4">ID</th>
+                <th>Category</th>
+                <th>Vehicle</th>
+                <th>Driver</th>
+                <th>Date</th>
+                <th>Vendor</th>
+                <th class="text-end pe-4">Total Cost (₹)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for exp in top_5_expenses %}
+              <tr>
+                <td class="ps-4 fw-bold text-dark">EXP-{{ exp.id }}</td>
+                <td><span class="badge bg-secondary bg-opacity-10 text-secondary">{{ exp.type }}</span></td>
+                <td>{{ exp.registration_number }}</td>
+                <td>{{ exp.driver_name or '--' }}</td>
+                <td>{{ exp.date }}</td>
+                <td>{{ exp.vendor or '--' }}</td>
+                <td class="text-end pe-4 fw-bold text-danger">₹{{ "{:,.2f}".format(exp.total_amount) }}</td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="7" class="text-center py-4 text-muted small">No top overheads recorded.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Manual Expense Modal -->
+<div class="modal fade" id="addExpenseModal" tabindex="-1" aria-labelledby="addExpenseModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content border-0 rounded-3 shadow-lg">
+      <form action="/expenses/add" method="POST" id="form-add-expense" class="needs-validation" novalidate>
+        <div class="modal-header bg-dark text-white rounded-top-3 py-3">
+          <h5 class="modal-title fw-bold" id="addExpenseModalLabel"><i class="bi bi-cash-stack me-2"></i>Record Manual Expense</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body p-4">
+          <div class="row g-3">
+            <!-- Expense Category -->
+            <div class="col-md-6">
+              <label for="add-category" class="form-label text-secondary small fw-semibold">Expense Category <span class="text-danger">*</span></label>
+              <select class="form-select" id="add-category" name="category" required>
+                <option value="" disabled selected>Select category...</option>
+                {% for cat in categories %}
+                  {% if cat != 'Fuel' and cat != 'Maintenance' %}
+                    <option value="{{ cat }}">{{ cat }}</option>
+                  {% endif %}
+                {% endfor %}
+                <option value="Fuel">Fuel (Manual Entry)</option>
+                <option value="Maintenance">Maintenance (Manual Entry)</option>
+              </select>
+              <div class="invalid-feedback">Please select a valid category.</div>
+            </div>
+
+            <!-- Vehicle Selection -->
+            <div class="col-md-6">
+              <label for="add-vehicle" class="form-label text-secondary small fw-semibold">Vehicle Asset <span class="text-danger">*</span></label>
+              <select class="form-select" id="add-vehicle" name="vehicle_id" required>
+                <option value="" disabled selected>Select vehicle...</option>
+                {% for v in vehicles %}
+                  <option value="{{ v.id }}">{{ v.registration_number }} ({{ v.name }})</option>
+                {% endfor %}
+              </select>
+              <div class="invalid-feedback">Please select a vehicle asset.</div>
+            </div>
+
+            <!-- Driver Selection (Optional) -->
+            <div class="col-md-6">
+              <label for="add-driver" class="form-label text-secondary small fw-semibold">Driver (Optional)</label>
+              <select class="form-select" id="add-driver" name="driver_id">
+                <option value="">No Driver</option>
+                {% for d in drivers %}
+                  <option value="{{ d.id }}">{{ d.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <!-- Related Trip Selection (Optional) -->
+            <div class="col-md-6">
+              <label for="add-trip" class="form-label text-secondary small fw-semibold">Related Trip (Optional)</label>
+              <select class="form-select" id="add-trip" name="trip_id">
+                <option value="">No Related Trip</option>
+                {% for t in trips %}
+                  <option value="{{ t.id }}">TRP-{{ t.id }}: {{ t.source }} to {{ t.destination }} ({{ t.dispatch_date }})</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <!-- Expense Date -->
+            <div class="col-md-6">
+              <label for="add-date" class="form-label text-secondary small fw-semibold">Expense Date <span class="text-danger">*</span></label>
+              <input type="date" class="form-control" id="add-date" name="date" required max="{{ today_str }}">
+              <div class="invalid-feedback">Please specify a date (cannot be in the future).</div>
+            </div>
+
+            <!-- Vendor / Payee -->
+            <div class="col-md-6">
+              <label for="add-vendor" class="form-label text-secondary small fw-semibold">Vendor / Payee</label>
+              <input type="text" class="form-control" id="add-vendor" name="vendor" placeholder="e.g., MRF Tyres, HP Petrol Pump">
+            </div>
+
+            <!-- Base Amount -->
+            <div class="col-md-4">
+              <label for="add-amount" class="form-label text-secondary small fw-semibold">Base Amount (₹) <span class="text-danger">*</span></label>
+              <div class="input-group">
+                <span class="input-group-text">₹</span>
+                <input type="number" class="form-control" id="add-amount" name="amount" step="0.01" min="0.01" required placeholder="0.00">
+                <div class="invalid-feedback">Please enter a valid amount greater than zero.</div>
+              </div>
+            </div>
+
+            <!-- GST Percent -->
+            <div class="col-md-4">
+              <label for="add-gst-percent" class="form-label text-secondary small fw-semibold">GST Rate (%)</label>
+              <div class="input-group">
+                <input type="number" class="form-control" id="add-gst-percent" name="gst_percent" step="0.1" min="0" value="0" placeholder="0">
+                <span class="input-group-text">%</span>
+                <div class="invalid-feedback">GST cannot be negative.</div>
+              </div>
+            </div>
+
+            <!-- Calculated GST Amount -->
+            <div class="col-md-4">
+              <label for="add-gst-amount" class="form-label text-secondary small fw-semibold">Calculated GST (₹)</label>
+              <div class="input-group">
+                <span class="input-group-text">₹</span>
+                <input type="text" class="form-control bg-light" id="add-gst-amount" readonly value="0.00">
+              </div>
+            </div>
+
+            <!-- Calculated Total Amount -->
+            <div class="col-md-6">
+              <label for="add-total-amount" class="form-label text-secondary small fw-semibold">Total Cost (₹ - Auto calculated)</label>
+              <div class="input-group">
+                <span class="input-group-text fw-semibold bg-light">₹</span>
+                <input type="text" class="form-control bg-light fw-bold text-primary" id="add-total-amount" readonly value="0.00">
+              </div>
+            </div>
+
+            <!-- Payment Method -->
+            <div class="col-md-6">
+              <label for="add-payment-method" class="form-label text-secondary small fw-semibold">Payment Method <span class="text-danger">*</span></label>
+              <select class="form-select" id="add-payment-method" name="payment_method" required>
+                <option value="" disabled selected>Select method...</option>
+                <option value="Cash">Cash</option>
+                <option value="UPI">UPI</option>
+                <option value="Bank Transfer">Bank Transfer</option>
+                <option value="Company Card">Company Card</option>
+                <option value="Cheque">Cheque</option>
+              </select>
+              <div class="invalid-feedback">Please select a payment method.</div>
+            </div>
+
+            <!-- Payment Status -->
+            <div class="col-md-6">
+              <label for="add-status" class="form-label text-secondary small fw-semibold">Payment Status <span class="text-danger">*</span></label>
+              <select class="form-select" id="add-status" name="status" required>
+                <option value="Paid">Paid</option>
+                <option value="Pending">Pending</option>
+                <option value="Cancelled">Cancelled</option>
+              </select>
+              <div class="invalid-feedback">Please select payment status.</div>
+            </div>
+
+            <!-- Attachment Filename -->
+            <div class="col-md-6">
+              <label for="add-attachment" class="form-label text-secondary small fw-semibold">Receipt Attachment Filename</label>
+              <input type="text" class="form-control" id="add-attachment" name="attachment" placeholder="e.g., invoice_4901.pdf">
+            </div>
+
+            <!-- Remarks -->
+            <div class="col-12">
+              <label for="add-remarks" class="form-label text-secondary small fw-semibold">Remarks / Description</label>
+              <textarea class="form-control" id="add-remarks" name="remarks" rows="2" placeholder="Provide additional details about the expense..."></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer bg-light py-3">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+          <button type="submit" class="btn btn-dark" id="btn-save-new-expense">Save Expense Record</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  .uppercase {
+    text-transform: uppercase;
+    font-size: 0.725rem;
+    letter-spacing: 0.05em;
+  }
+  .bg-teal {
+    background-color: #e6f4ea;
+    color: #137333;
+  }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Client-side GST auto calculation
+    const amountInput = document.getElementById('add-amount');
+    const gstPercentInput = document.getElementById('add-gst-percent');
+    const gstAmountInput = document.getElementById('add-gst-amount');
+    const totalAmountInput = document.getElementById('add-total-amount');
+
+    function calculateGST() {
+        const amount = parseFloat(amountInput.value) || 0;
+        const gstPercent = parseFloat(gstPercentInput.value) || 0;
+        const gstAmount = (amount * gstPercent) / 100;
+        const totalAmount = amount + gstAmount;
+
+        gstAmountInput.value = gstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        totalAmountInput.value = totalAmount.toFixed(2);
+    }
+
+    if (amountInput && gstPercentInput) {
+        amountInput.addEventListener('input', calculateGST);
+        gstPercentInput.addEventListener('input', calculateGST);
+    }
+
+    // Set today as default date
+    const dateInput = document.getElementById('add-date');
+    if (dateInput && !dateInput.value) {
+        const today = new Date().toISOString().split('T')[0];
+        dateInput.value = today;
+    }
+
+    // Bootstrap validation trigger
+    const form = document.getElementById('form-add-expense');
+    form.addEventListener('submit', function(event) {
+        if (!form.checkValidity()) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        form.classList.add('was-validated');
+    }, false);
+});
+</script>
+{% endblock %}

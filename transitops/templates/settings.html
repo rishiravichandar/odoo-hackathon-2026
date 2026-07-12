@@ -1,0 +1,133 @@
+{% extends 'base.html' %}
+
+{% block title %}Settings - TransitOps{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-2">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h2 class="fw-bold text-dark m-0"><i class="bi bi-gear-fill me-2 text-primary"></i>User Settings</h2>
+      <p class="text-secondary small m-0">Manage your profile, credentials, and configuration</p>
+    </div>
+  </div>
+
+  <div class="row">
+    <!-- Profile Card -->
+    <div class="col-lg-8 col-md-12">
+      <div class="card border-0 shadow-sm rounded-3 mb-4">
+        <div class="card-header bg-dark text-white p-3">
+          <h5 class="card-title m-0 fw-semibold"><i class="bi bi-person-bounding-box me-2"></i>Edit Profile Information</h5>
+        </div>
+        <div class="card-body p-4">
+          <form action="/settings" method="POST" id="form-user-settings">
+            <div class="row g-3">
+              <!-- Name -->
+              <div class="col-md-6">
+                <label for="name" class="form-label fw-semibold text-secondary">Full Name</label>
+                <div class="input-group">
+                  <span class="input-group-text bg-light border-end-0"><i class="bi bi-person text-secondary"></i></span>
+                  <input type="text" class="form-control bg-light border-start-0 ps-0" id="name" name="name" value="{{ user.name }}" required>
+                </div>
+              </div>
+
+              <!-- Email -->
+              <div class="col-md-6">
+                <label for="email" class="form-label fw-semibold text-secondary">Email Address</label>
+                <div class="input-group">
+                  <span class="input-group-text bg-light border-end-0"><i class="bi bi-envelope text-secondary"></i></span>
+                  <input type="email" class="form-control bg-light border-start-0 ps-0" id="email" name="email" value="{{ user.email }}" required>
+                </div>
+              </div>
+
+              <!-- Role (Read Only) -->
+              <div class="col-12">
+                <label class="form-label fw-semibold text-secondary">Assigned Role</label>
+                <div class="p-3 bg-light border rounded-3 d-flex align-items-center justify-content-between">
+                  <div class="d-flex align-items-center gap-3">
+                    <i class="bi bi-shield-lock-fill fs-4 text-primary"></i>
+                    <div>
+                      <div class="fw-bold text-dark">{{ user.role }}</div>
+                      <small class="text-muted">Roles are assigned by system administrators and govern your system access permissions.</small>
+                    </div>
+                  </div>
+                  <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 px-3 py-2 rounded-pill fw-semibold">{{ user.role }}</span>
+                </div>
+              </div>
+
+              <!-- Divider -->
+              <div class="col-12 my-4">
+                <hr class="text-muted opacity-25">
+                <h5 class="fw-bold text-dark mb-1"><i class="bi bi-key-fill me-2 text-warning"></i>Security & Credentials</h5>
+                <p class="text-muted small">Leave password fields blank if you do not wish to change your current password.</p>
+              </div>
+
+              <!-- New Password -->
+              <div class="col-md-6">
+                <label for="new_password" class="form-label fw-semibold text-secondary">New Password</label>
+                <div class="input-group">
+                  <span class="input-group-text bg-light border-end-0"><i class="bi bi-lock text-secondary"></i></span>
+                  <input type="password" class="form-control bg-light border-start-0 ps-0" id="new_password" name="new_password" placeholder="Min. 6 characters">
+                </div>
+              </div>
+
+              <!-- Confirm Password -->
+              <div class="col-md-6">
+                <label for="confirm_password" class="form-label fw-semibold text-secondary">Confirm New Password</label>
+                <div class="input-group">
+                  <span class="input-group-text bg-light border-end-0"><i class="bi bi-lock-fill text-secondary"></i></span>
+                  <input type="password" class="form-control bg-light border-start-0 ps-0" id="confirm_password" name="confirm_password" placeholder="Retype new password">
+                </div>
+              </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="d-flex justify-content-end gap-2 mt-4">
+              <a href="/" class="btn btn-outline-secondary px-4" id="btn-cancel-settings">Cancel</a>
+              <button type="submit" class="btn btn-primary px-4" id="btn-save-settings">
+                <i class="bi bi-check-circle me-1"></i> Save Changes
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Info Side Column -->
+    <div class="col-lg-4 col-md-12">
+      <div class="card border-0 shadow-sm rounded-3 mb-4 bg-light text-dark">
+        <div class="card-body p-4">
+          <h5 class="fw-bold mb-3"><i class="bi bi-info-circle me-2 text-info"></i>Your Role Permissions</h5>
+          <p class="text-secondary small">Your system access is guided by role assignments. Below is a summary of what your current role can do:</p>
+          
+          <div class="mt-3">
+            <span class="fw-bold text-dark">{{ user.role }} Access Matrix:</span>
+            <ul class="list-unstyled mt-2 small text-secondary">
+              {% if user.role == 'Fleet Manager' %}
+                <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Full configuration and CRUD control across all fleet resources.</li>
+                <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Driver hiring, profile updates, and vehicle allocation.</li>
+                <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Operational and financial transaction audit trails.</li>
+                <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Full reports extraction and database system parameters.</li>
+              {% elif user.role == 'Driver' %}
+                <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Read-only view of assigned vehicle details.</li>
+                <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Start, log, and finish assigned dispatch journeys.</li>
+                <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Submit dynamic fuel transaction entries.</li>
+                <li class="mb-2"><i class="bi bi-x-circle-fill text-danger me-2"></i> Cannot manage fleet drivers, maintenance schedule, or expenses.</li>
+              {% elif user.role == 'Safety Officer' %}
+                <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Driver profile, license, and assignment inspection.</li>
+                <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Schedule, log, edit, and complete active maintenance jobs.</li>
+                <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Oversee system dispatch and road safety parameters.</li>
+                <li class="mb-2"><i class="bi bi-x-circle-fill text-danger me-2"></i> Cannot record fuel, general expenses, or modify financial rosters.</li>
+              {% elif user.role == 'Financial Analyst' %}
+                <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> View vehicle lists, general fuel logs, and financial dashboards.</li>
+                <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Read-write access to organizational expenses and cost entries.</li>
+                <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Print, audit, and extract operational analytics.</li>
+                <li class="mb-2"><i class="bi bi-x-circle-fill text-danger me-2"></i> Cannot manage vehicle profiles, roster drivers, or trigger maintenance.</li>
+              {% endif %}
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

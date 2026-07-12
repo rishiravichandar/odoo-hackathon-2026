@@ -1,0 +1,611 @@
+{% extends 'base.html' %}
+
+{% block title %}Reports & Business Intelligence - TransitOps{% endblock %}
+
+{% block content %}
+<div class="mb-4 d-flex flex-wrap align-items-center justify-content-between gap-3">
+  <div>
+    <h2 class="fw-bold text-dark m-0">Fleet Business Intelligence Center</h2>
+    <p class="text-secondary small m-0">Consolidated analytics, auditable operational records, and multi-format reporting logs</p>
+  </div>
+  
+  <div class="d-flex gap-2">
+    <!-- Export dropdown -->
+    <div class="dropdown">
+      <button class="btn btn-outline-dark btn-sm dropdown-toggle" type="button" id="exportDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+        📥 Export Dataset (CSV)
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="exportDropdown">
+        <li><a class="dropdown-item" href="/reports/export?type=fleet">Overall Fleet Overview</a></li>
+        <li><a class="dropdown-item" href="/reports/export?type=vehicle">Vehicles Ledger</a></li>
+        <li><a class="dropdown-item" href="/reports/export?type=driver">Drivers Roster</a></li>
+        <li><a class="dropdown-item" href="/reports/export?type=trip">Trips Audit Log</a></li>
+        <li><a class="dropdown-item" href="/reports/export?type=fuel">Fuel Purchase Logs</a></li>
+        <li><a class="dropdown-item" href="/reports/export?type=maintenance">Maintenance Records</a></li>
+        <li><a class="dropdown-item" href="/reports/export?type=expense">Expense Statement</a></li>
+      </ul>
+    </div>
+
+    <!-- Print dropdown -->
+    <div class="dropdown">
+      <button class="btn btn-outline-dark btn-sm dropdown-toggle" type="button" id="printDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+        🖨️ Printable Version
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="printDropdown">
+        <li><a class="dropdown-item" target="_blank" href="/reports/print?type=all">Complete Report (All Sections)</a></li>
+        <li><a class="dropdown-item" target="_blank" href="/reports/print?type=vehicle">Vehicles Report</a></li>
+        <li><a class="dropdown-item" target="_blank" href="/reports/print?type=driver">Drivers Report</a></li>
+        <li><a class="dropdown-item" target="_blank" href="/reports/print?type=trip">Trips Report</a></li>
+        <li><a class="dropdown-item" target="_blank" href="/reports/print?type=fuel">Fuel Report</a></li>
+        <li><a class="dropdown-item" target="_blank" href="/reports/print?type=maintenance">Maintenance Report</a></li>
+        <li><a class="dropdown-item" target="_blank" href="/reports/print?type=expense">Expense Report</a></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Tab Navigation -->
+<ul class="nav nav-pills mb-4 gap-2 bg-light p-2 rounded" id="reportsTab" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link active btn-sm" id="summary-tab" data-bs-toggle="tab" data-bs-target="#summary-pane" type="button" role="tab">📊 BI Summary</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link btn-sm" id="vehicles-tab" data-bs-toggle="tab" data-bs-target="#vehicles-pane" type="button" role="tab">🚚 Vehicles Ledger</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link btn-sm" id="drivers-tab" data-bs-toggle="tab" data-bs-target="#drivers-pane" type="button" role="tab">👥 Drivers Roster</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link btn-sm" id="trips-tab" data-bs-toggle="tab" data-bs-target="#trips-pane" type="button" role="tab">🗺️ Trips Log</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link btn-sm" id="fuel-tab" data-bs-toggle="tab" data-bs-target="#fuel-pane" type="button" role="tab">⛽ Fuel Purchases</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link btn-sm" id="maintenance-tab" data-bs-toggle="tab" data-bs-target="#maintenance-pane" type="button" role="tab">🔧 Maintenance Audits</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link btn-sm" id="expenses-tab" data-bs-toggle="tab" data-bs-target="#expenses-pane" type="button" role="tab">💵 Expenses Statement</button>
+  </li>
+</ul>
+
+<div class="tab-content" id="reportsTabContent">
+  <!-- 1. EXECUTIVE BI SUMMARY PANE -->
+  <div class="tab-pane fade show active" id="summary-pane" role="tabpanel" aria-labelledby="summary-tab">
+    <!-- Summary KPIs -->
+    <div class="row g-3 mb-4">
+      {% set ns = namespace(total_expenditure=0, total_jobs=0, max_expenditure=0, max_veh="") %}
+      {% for v in vehicle_stats %}
+        {% set ns.total_expenditure = ns.total_expenditure + (v.total_cost or 0) %}
+        {% set ns.total_jobs = ns.total_jobs + (v.total_services or 0) %}
+        {% if (v.total_cost or 0) > ns.max_expenditure %}
+          {% set ns.max_expenditure = v.total_cost %}
+          {% set ns.max_veh = v.registration_number %}
+        {% endif %}
+      {% endfor %}
+
+      <div class="col-md-4">
+        <div class="card border-0 shadow-sm bg-white rounded-3 h-100">
+          <div class="card-body p-4 d-flex align-items-center justify-content-between">
+            <div>
+              <span class="text-muted small fw-semibold d-block mb-1">Total Maintenance Spent</span>
+              <h2 class="fw-bold m-0 text-dark">₹{{ "{:,.2f}".format(ns.total_expenditure) }}</h2>
+              <span class="text-success small d-block mt-1"><i class="bi bi-arrow-up-right me-1"></i>Accumulated completed jobs</span>
+            </div>
+            <div class="p-3.5 rounded-3 bg-success bg-opacity-10 text-success">
+              <i class="bi bi-cash-coin fs-3"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="card border-0 shadow-sm bg-white rounded-3 h-100">
+          <div class="card-body p-4 d-flex align-items-center justify-content-between">
+            <div>
+              <span class="text-muted small fw-semibold d-block mb-1">Total Finished Services</span>
+              <h2 class="fw-bold m-0 text-dark">{{ ns.total_jobs }}</h2>
+              <span class="text-secondary small d-block mt-1">Services transitioned to 'Completed'</span>
+            </div>
+            <div class="p-3.5 rounded-3 bg-primary bg-opacity-10 text-primary">
+              <i class="bi bi-wrench-adjustable-circle fs-3"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="card border-0 shadow-sm bg-white rounded-3 h-100">
+          <div class="card-body p-4 d-flex align-items-center justify-content-between">
+            <div>
+              <span class="text-muted small fw-semibold d-block mb-1">Highest Maintenance Overhead</span>
+              <h2 class="fw-bold m-0 text-danger" style="font-size: 1.4rem;">
+                {% if ns.max_veh %}
+                  {{ ns.max_veh }} (₹{{ "{:,.0f}".format(ns.max_expenditure) }})
+                {% else %}
+                  No Records
+                {% endif %}
+              </h2>
+              <span class="text-secondary small d-block mt-1">Vehicle asset with highest service bills</span>
+            </div>
+            <div class="p-3.5 rounded-3 bg-danger bg-opacity-10 text-danger">
+              <i class="bi bi-exclamation-octagon fs-3"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Charts / Distributions -->
+    <div class="row g-4 mb-4">
+      <div class="col-lg-6">
+        <div class="card border-0 shadow-sm rounded-3 h-100">
+          <div class="card-header bg-white py-3 border-bottom border-light">
+            <h5 class="card-title fw-bold m-0 text-dark">Service Categories Breakdown</h5>
+          </div>
+          <div class="card-body p-0">
+            <div class="table-responsive">
+              <table class="table table-hover align-middle m-0">
+                <thead class="table-light">
+                  <tr>
+                    <th class="ps-4">Service Type</th>
+                    <th class="text-center">Completed Jobs</th>
+                    <th class="text-end pe-4">Total Cost</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for ts in type_stats %}
+                  <tr>
+                    <td class="ps-4 fw-semibold text-dark">{{ ts.maintenance_type }}</td>
+                    <td class="text-center"><span class="badge bg-secondary rounded-pill px-2.5">{{ ts.count }}</span></td>
+                    <td class="text-end pe-4 fw-bold text-dark">₹{{ "{:,.2f}".format(ts.total_cost or 0.0) }}</td>
+                  </tr>
+                  {% else %}
+                  <tr>
+                    <td colspan="3" class="text-center py-4 text-muted small">No completed service statistics.</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-6">
+        <div class="card border-0 shadow-sm rounded-3 h-100">
+          <div class="card-header bg-white py-3 border-bottom border-light">
+            <h5 class="card-title fw-bold m-0 text-dark">Recent Completed Maintenance Cost Ledger</h5>
+          </div>
+          <div class="card-body p-0">
+            <div class="table-responsive" style="max-height: 280px;">
+              <table class="table table-hover align-middle m-0">
+                <thead class="table-light">
+                  <tr>
+                    <th class="ps-4">Completion Date</th>
+                    <th class="text-end pe-4">Total Day Spend</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for tr in trend_stats %}
+                  <tr>
+                    <td class="ps-4 text-secondary small fw-medium">{{ tr.completed_date }}</td>
+                    <td class="text-end pe-4 fw-bold text-success">₹{{ "{:,.2f}".format(tr.daily_cost or 0.0) }}</td>
+                  </tr>
+                  {% else %}
+                  <tr>
+                    <td colspan="2" class="text-center py-4 text-muted small">No recent completion expense logs.</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Detailed Vehicles Maintenance KPIs -->
+    <div class="card border-0 shadow-sm rounded-3">
+      <div class="card-header bg-white py-3 border-bottom border-light">
+        <h5 class="card-title fw-bold m-0 text-dark">Vehicle Maintenance Performance</h5>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle m-0">
+            <thead class="table-light">
+              <tr>
+                <th class="ps-4">Vehicle</th>
+                <th>Model</th>
+                <th>Type</th>
+                <th>Odometer</th>
+                <th class="text-center">Total Services</th>
+                <th>Last Service Date</th>
+                <th class="text-end">Total Spent</th>
+                <th class="text-end pe-4">Avg Cost/Service</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for stat in vehicle_stats %}
+              <tr>
+                <td class="ps-4 font-mono fw-bold text-primary">{{ stat.registration_number }}</td>
+                <td><span class="text-dark fw-medium">{{ stat.name }}</span></td>
+                <td><span class="text-secondary small">{{ stat.type }}</span></td>
+                <td class="text-secondary font-mono text-xs">{{ "{:,.0f}".format(stat.odometer or 0) }} km</td>
+                <td class="text-center"><span class="badge bg-dark rounded-pill px-2.5">{{ stat.total_services }}</span></td>
+                <td>{{ stat.last_service_date or '—' }}</td>
+                <td class="text-end fw-bold text-dark font-mono">₹{{ "{:,.2f}".format(stat.total_cost or 0.0) }}</td>
+                <td class="text-end pe-4 text-secondary font-mono">₹{{ "{:,.2f}".format(stat.avg_cost or 0.0) }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. VEHICLES LEDGER PANE -->
+  <div class="tab-pane fade" id="vehicles-pane" role="tabpanel" aria-labelledby="vehicles-tab">
+    <div class="card border-0 shadow-sm rounded-3">
+      <div class="card-header bg-white py-3 d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <h5 class="card-title fw-bold m-0 text-dark">Fleet Vehicles Directory</h5>
+        <div class="d-flex gap-2">
+          <input type="text" class="form-control form-control-sm search-table" data-target="vehicles-table" placeholder="🔎 Search vehicles...">
+        </div>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle m-0" id="vehicles-table">
+            <thead class="table-light">
+              <tr>
+                <th class="ps-4">Reg Number</th>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Max Payload</th>
+                <th>Odometer</th>
+                <th>Acquisition Cost</th>
+                <th>ROI</th>
+                <th>Status</th>
+                <th class="pe-4">Region</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for v in vehicles %}
+              <tr>
+                <td class="ps-4 fw-bold font-mono text-primary">{{ v.registration_number }}</td>
+                <td>{{ v.name }}</td>
+                <td>{{ v.type }}</td>
+                <td>{{ v.max_load_capacity }} kg</td>
+                <td class="font-mono text-xs">{{ "{:,}".format(v.odometer) }} km</td>
+                <td class="font-mono">₹{{ "{:,.2f}".format(v.acquisition_cost) }}</td>
+                <td class="font-mono fw-bold {% if v.roi < 0 %}text-danger{% else %}text-success{% endif %}">{{ v.roi_percent }}</td>
+                <td>
+                  {% if v.status == 'Available' %}
+                    <span class="badge bg-success-subtle text-success">Available</span>
+                  {% elif v.status == 'On Trip' %}
+                    <span class="badge bg-primary-subtle text-primary">On Trip</span>
+                  {% elif v.status == 'In Shop' %}
+                    <span class="badge bg-warning-subtle text-warning">In Shop</span>
+                  {% else %}
+                    <span class="badge bg-secondary-subtle text-secondary">{{ v.status }}</span>
+                  {% endif %}
+                </td>
+                <td class="pe-4 text-secondary">{{ v.region }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. DRIVERS ROSTER PANE -->
+  <div class="tab-pane fade" id="drivers-pane" role="tabpanel" aria-labelledby="drivers-tab">
+    <div class="card border-0 shadow-sm rounded-3">
+      <div class="card-header bg-white py-3 d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <h5 class="card-title fw-bold m-0 text-dark">Active Driver Directory &amp; Safety Scores</h5>
+        <div class="d-flex gap-2">
+          <input type="text" class="form-control form-control-sm search-table" data-target="drivers-table" placeholder="🔎 Search drivers...">
+        </div>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle m-0" id="drivers-table">
+            <thead class="table-light">
+              <tr>
+                <th class="ps-4">Driver Name</th>
+                <th>Employee ID</th>
+                <th>License Class</th>
+                <th>Expiry</th>
+                <th>Assigned Vehicle</th>
+                <th>Contact</th>
+                <th>Total Trips</th>
+                <th>Safety Score</th>
+                <th class="pe-4">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for d in drivers %}
+              <tr>
+                <td class="ps-4 fw-bold text-dark">{{ d.name }}</td>
+                <td class="font-mono text-xs">{{ d.employee_id }}</td>
+                <td>{{ d.license_category }}</td>
+                <td class="small">{{ d.license_expiry_date }}</td>
+                <td class="font-mono text-xs text-primary">{{ d.vehicle_reg or 'None' }}</td>
+                <td class="text-secondary small">{{ d.contact_number }}</td>
+                <td><span class="badge bg-light text-dark border">{{ d.trips_count }}</span></td>
+                <td>
+                  <div class="d-flex align-items-center gap-2">
+                    <span class="fw-bold {% if d.safety_score >= 90 %}text-success{% elif d.safety_score >= 75 %}text-warning{% else %}text-danger{% endif %}">
+                      {{ d.safety_score }}/100
+                    </span>
+                    <div class="progress" style="width: 60px; height: 6px;">
+                      <div class="progress-bar {% if d.safety_score >= 90 %}bg-success{% elif d.safety_score >= 75 %}bg-warning{% else %}bg-danger{% endif %}" style="width: {{ d.safety_score }}%;"></div>
+                    </div>
+                  </div>
+                </td>
+                <td class="pe-4">
+                  {% if d.status == 'Available' %}
+                    <span class="badge bg-success-subtle text-success">Available</span>
+                  {% elif d.status == 'On Trip' %}
+                    <span class="badge bg-primary-subtle text-primary">On Trip</span>
+                  {% elif d.status == 'Off Duty' %}
+                    <span class="badge bg-warning-subtle text-warning">Off Duty</span>
+                  {% else %}
+                    <span class="badge bg-secondary-subtle text-secondary">{{ d.status }}</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. TRIPS LOG PANE -->
+  <div class="tab-pane fade" id="trips-pane" role="tabpanel" aria-labelledby="trips-tab">
+    <div class="card border-0 shadow-sm rounded-3">
+      <div class="card-header bg-white py-3 d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <h5 class="card-title fw-bold m-0 text-dark">Historical Trips Dispatch Records</h5>
+        <div class="d-flex gap-2">
+          <input type="text" class="form-control form-control-sm search-table" data-target="trips-table" placeholder="🔎 Search routes, drivers, statuses...">
+        </div>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle m-0" id="trips-table">
+            <thead class="table-light">
+              <tr>
+                <th class="ps-4">Trip ID</th>
+                <th>Source ➔ Destination</th>
+                <th>Vehicle</th>
+                <th>Driver</th>
+                <th>Cargo Weight</th>
+                <th>Distance</th>
+                <th>Revenue</th>
+                <th>Fuel Logged</th>
+                <th>Dispatch Date</th>
+                <th class="pe-4">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for t in trips %}
+              <tr>
+                <td class="ps-4 font-mono text-xs">TRP-{{ t.id }}</td>
+                <td class="fw-semibold text-dark">{{ t.source }} ➔ {{ t.destination }}</td>
+                <td class="font-mono text-xs text-primary">{{ t.vehicle_reg }}</td>
+                <td>{{ t.driver_name }}</td>
+                <td>{{ t.cargo_weight }} kg</td>
+                <td class="font-mono">{{ t.planned_distance }} km</td>
+                <td class="fw-medium text-success">₹{{ "{:,.2f}".format(t.revenue) }}</td>
+                <td class="text-secondary">{{ t.fuel_consumed or 0.0 }} L</td>
+                <td class="small">{{ t.dispatch_date }}</td>
+                <td class="pe-4">
+                  {% if t.status == 'Completed' %}
+                    <span class="badge bg-success-subtle text-success">Completed</span>
+                  {% elif t.status in ['In Progress', 'Dispatched'] %}
+                    <span class="badge bg-primary-subtle text-primary">In Progress</span>
+                  {% elif t.status == 'Cancelled' %}
+                    <span class="badge bg-danger-subtle text-danger">Cancelled</span>
+                  {% else %}
+                    <span class="badge bg-secondary-subtle text-secondary">{{ t.status }}</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. FUEL PURCHASES PANE -->
+  <div class="tab-pane fade" id="fuel-pane" role="tabpanel" aria-labelledby="fuel-tab">
+    <div class="card border-0 shadow-sm rounded-3">
+      <div class="card-header bg-white py-3 d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <h5 class="card-title fw-bold m-0 text-dark">Fuel Purchase &amp; Fuel Station Ledger</h5>
+        <div class="d-flex gap-2">
+          <input type="text" class="form-control form-control-sm search-table" data-target="fuel-table" placeholder="🔎 Search fuel stations or vehicles...">
+        </div>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle m-0" id="fuel-table">
+            <thead class="table-light">
+              <tr>
+                <th class="ps-4">Date</th>
+                <th>Vehicle</th>
+                <th>Driver</th>
+                <th>Fuel Station</th>
+                <th>Fuel Type</th>
+                <th class="text-end">Liters</th>
+                <th class="text-end">Price/Liter</th>
+                <th class="text-end">Total Cost</th>
+                <th class="text-end">Odometer</th>
+                <th class="pe-4">Method</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for f in fuel_logs %}
+              <tr>
+                <td class="ps-4 small">{{ f.date }}</td>
+                <td class="font-mono text-xs fw-bold text-primary">{{ f.vehicle_reg }}</td>
+                <td>{{ f.driver_name or '—' }}</td>
+                <td>{{ f.fuel_station }}</td>
+                <td><span class="badge bg-light text-dark border">{{ f.fuel_type }}</span></td>
+                <td class="text-end font-mono">{{ f.liters }} L</td>
+                <td class="text-end font-mono">₹{{ f.price_per_liter }}</td>
+                <td class="text-end fw-bold text-dark font-mono">₹{{ "{:,.2f}".format(f.cost) }}</td>
+                <td class="text-end font-mono text-xs">{{ "{:,}".format(f.odometer) }} km</td>
+                <td class="pe-4 text-secondary small">{{ f.payment_method }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. MAINTENANCE AUDITS PANE -->
+  <div class="tab-pane fade" id="maintenance-pane" role="tabpanel" aria-labelledby="maintenance-tab">
+    <div class="card border-0 shadow-sm rounded-3">
+      <div class="card-header bg-white py-3 d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <h5 class="card-title fw-bold m-0 text-dark">Detailed Vehicle Maintenance Audits</h5>
+        <div class="d-flex gap-2">
+          <input type="text" class="form-control form-control-sm search-table" data-target="maint-table" placeholder="🔎 Search centers, type or vehicle...">
+        </div>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle m-0" id="maint-table">
+            <thead class="table-light">
+              <tr>
+                <th class="ps-4">ID</th>
+                <th>Vehicle</th>
+                <th>Service Type</th>
+                <th>Service Center</th>
+                <th>Technician</th>
+                <th>Scheduled Date</th>
+                <th>Completed Date</th>
+                <th class="text-end">Actual Cost</th>
+                <th class="pe-4">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for m in maintenance_logs %}
+              <tr>
+                <td class="ps-4 font-mono text-xs text-secondary">MNT-{{ m.id }}</td>
+                <td class="font-mono text-xs fw-bold text-primary">{{ m.vehicle_reg }}</td>
+                <td><strong>{{ m.maintenance_type }}</strong></td>
+                <td>{{ m.service_center }}</td>
+                <td>{{ m.technician_name }}</td>
+                <td class="small">{{ m.scheduled_date }}</td>
+                <td class="small">{{ m.completed_date or 'In Progress' }}</td>
+                <td class="text-end fw-bold text-dark font-mono">₹{{ "{:,.2f}".format(m.actual_cost or 0.0) }}</td>
+                <td class="pe-4">
+                  {% if m.status == 'Completed' %}
+                    <span class="badge bg-success-subtle text-success">Completed</span>
+                  {% elif m.status == 'Scheduled' %}
+                    <span class="badge bg-info-subtle text-info">Scheduled</span>
+                  {% elif m.status == 'Overdue' %}
+                    <span class="badge bg-danger-subtle text-danger">Overdue</span>
+                  {% else %}
+                    <span class="badge bg-secondary-subtle text-secondary">{{ m.status }}</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 7. EXPENSES STATEMENT PANE -->
+  <div class="tab-pane fade" id="expenses-pane" role="tabpanel" aria-labelledby="expenses-tab">
+    <div class="card border-0 shadow-sm rounded-3">
+      <div class="card-header bg-white py-3 d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <h5 class="card-title fw-bold m-0 text-dark">Consolidated Expenses ledger</h5>
+        <div class="d-flex gap-2">
+          <input type="text" class="form-control form-control-sm search-table" data-target="expenses-table" placeholder="🔎 Search vendors, categories, types...">
+        </div>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle m-0" id="expenses-table">
+            <thead class="table-light">
+              <tr>
+                <th class="ps-4">ID</th>
+                <th>Vehicle</th>
+                <th>Category</th>
+                <th>Base Amt</th>
+                <th>GST Amt</th>
+                <th class="text-end">Total Amount</th>
+                <th>Vendor</th>
+                <th>Date</th>
+                <th>Payment Method</th>
+                <th class="pe-4">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for e in expenses %}
+              <tr>
+                <td class="ps-4 font-mono text-xs">EXP-{{ e.id }}</td>
+                <td class="font-mono text-xs text-primary">{{ e.vehicle_reg }}</td>
+                <td><span class="badge bg-light text-dark border">{{ e.type }}</span></td>
+                <td class="font-mono text-secondary">₹{{ "{:,.2f}".format(e.amount) }}</td>
+                <td class="font-mono text-muted text-xs">₹{{ "{:,.2f}".format(e.gst_amount) }}</td>
+                <td class="text-end fw-bold text-dark font-mono">₹{{ "{:,.2f}".format(e.total_amount) }}</td>
+                <td>{{ e.vendor }}</td>
+                <td class="small">{{ e.date }}</td>
+                <td>{{ e.payment_method }}</td>
+                <td class="pe-4">
+                  {% if e.status == 'Paid' %}
+                    <span class="badge bg-success-subtle text-success">Paid</span>
+                  {% elif e.status == 'Pending' %}
+                    <span class="badge bg-warning-subtle text-warning">Pending</span>
+                  {% else %}
+                    <span class="badge bg-danger-subtle text-danger">{{ e.status }}</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    // Interactive filter search script for operational reports tables
+    const searchInputs = document.querySelectorAll(".search-table");
+    searchInputs.forEach(input => {
+        input.addEventListener("keyup", function() {
+            const targetId = this.getAttribute("data-target");
+            const filterValue = this.value.toLowerCase();
+            const table = document.getElementById(targetId);
+            const rows = table.querySelectorAll("tbody tr");
+            
+            rows.forEach(row => {
+                const text = row.innerText.toLowerCase();
+                if (text.indexOf(filterValue) > -1) {
+                    row.style.display = "";
+                } else {
+                    row.style.display = "none";
+                }
+            });
+        });
+    });
+});
+</script>
+{% endblock %}

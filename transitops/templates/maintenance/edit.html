@@ -1,0 +1,100 @@
+{% extends 'base.html' %}
+
+{% block title %}Edit Maintenance MNT-{{ log.id }} - TransitOps{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+  <ol class="breadcrumb small">
+    <li class="breadcrumb-item"><a href="/" class="text-decoration-none text-secondary">Dashboard</a></li>
+    <li class="breadcrumb-item"><a href="/maintenance" class="text-decoration-none text-secondary">Maintenance Center</a></li>
+    <li class="breadcrumb-item"><a href="/maintenance/{{ log.id }}" class="text-decoration-none text-secondary">Job MNT-{{ log.id }}</a></li>
+    <li class="breadcrumb-item active text-dark" aria-current="page">Edit Schedule</li>
+  </ol>
+</nav>
+
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="card border-0 shadow-sm rounded-3">
+      <div class="card-header bg-white py-3 border-bottom border-light">
+        <h4 class="card-title fw-bold m-0 text-dark d-flex align-items-center gap-2">
+          <i class="bi bi-pencil-square text-primary"></i> Edit Maintenance Job MNT-{{ log.id }}
+        </h4>
+        <p class="text-secondary small m-0 mt-1">Vehicle Asset: <strong>{{ log.vehicle_reg }}</strong> &mdash; {{ log.vehicle_name }}</p>
+      </div>
+      <div class="card-body p-4">
+        <form action="/maintenance/edit/{{ log.id }}" method="POST" id="edit-maintenance-form">
+          <div class="row g-3">
+            <!-- Maintenance Type -->
+            <div class="col-md-6">
+              <label for="maintenance_type" class="form-label small fw-semibold text-dark">Service / Maintenance Type <span class="text-danger">*</span></label>
+              <select class="form-select form-select-sm" id="maintenance_type" name="maintenance_type" required>
+                <option value="Oil Change" {% if log.maintenance_type == 'Oil Change' %}selected{% endif %}>Oil Change</option>
+                <option value="Brake Inspection" {% if log.maintenance_type == 'Brake Inspection' %}selected{% endif %}>Brake Inspection</option>
+                <option value="Engine Service" {% if log.maintenance_type == 'Engine Service' %}selected{% endif %}>Engine Service</option>
+                <option value="Tyre Replacement" {% if log.maintenance_type == 'Tyre Replacement' %}selected{% endif %}>Tyre Replacement</option>
+                <option value="Battery Check" {% if log.maintenance_type == 'Battery Check' %}selected{% endif %}>Battery Check</option>
+                <option value="General Service" {% if log.maintenance_type == 'General Service' %}selected{% endif %}>General Service</option>
+                <option value="AC Service" {% if log.maintenance_type == 'AC Service' %}selected{% endif %}>AC Service</option>
+                <option value="Suspension" {% if log.maintenance_type == 'Suspension' %}selected{% endif %}>Suspension</option>
+                <option value="Electrical" {% if log.maintenance_type == 'Electrical' %}selected{% endif %}>Electrical</option>
+                <option value="Other" {% if log.maintenance_type == 'Other' %}selected{% endif %}>Other</option>
+              </select>
+            </div>
+
+            <!-- Service Center -->
+            <div class="col-md-6">
+              <label for="service_center" class="form-label small fw-semibold text-dark">Service Center / Workshop Name <span class="text-danger">*</span></label>
+              <select class="form-select form-select-sm" id="service_center" name="service_center" required>
+                <option value="Tata Motors Service Centre" {% if log.service_center == 'Tata Motors Service Centre' %}selected{% endif %}>Tata Motors Service Centre</option>
+                <option value="Ashok Leyland Workshop" {% if log.service_center == 'Ashok Leyland Workshop' %}selected{% endif %}>Ashok Leyland Workshop</option>
+                <option value="Mahindra First Choice" {% if log.service_center == 'Mahindra First Choice' %}selected{% endif %}>Mahindra First Choice</option>
+                <option value="Bosch Car Service" {% if log.service_center == 'Bosch Car Service' %}selected{% endif %}>Bosch Car Service</option>
+                <option value="TVS Vehicle Care" {% if log.service_center == 'TVS Vehicle Care' %}selected{% endif %}>TVS Vehicle Care</option>
+              </select>
+            </div>
+
+            <!-- Technician Name -->
+            <div class="col-md-6">
+              <label for="technician_name" class="form-label small fw-semibold text-dark">Technician Name / Handler <span class="text-danger">*</span></label>
+              <input type="text" class="form-control form-control-sm" id="technician_name" name="technician_name" value="{{ log.technician_name }}" required>
+            </div>
+
+            <!-- Scheduled Date -->
+            <div class="col-md-6">
+              <label for="scheduled_date" class="form-label small fw-semibold text-dark">Scheduled Date <span class="text-danger">*</span></label>
+              <input type="date" class="form-control form-control-sm" id="scheduled_date" name="scheduled_date" value="{{ log.scheduled_date }}" required>
+            </div>
+
+            <!-- Estimated Cost -->
+            <div class="col-md-6">
+              <label for="estimated_cost" class="form-label small fw-semibold text-dark">Estimated Cost ($) <span class="text-danger">*</span></label>
+              <div class="input-group input-group-sm">
+                <span class="input-group-text">$</span>
+                <input type="number" class="form-control form-control-sm" id="estimated_cost" name="estimated_cost" min="0" step="0.01" value="{{ log.estimated_cost }}" required>
+              </div>
+            </div>
+
+            <!-- Estimated Duration -->
+            <div class="col-md-6">
+              <label for="estimated_duration" class="form-label small fw-semibold text-dark">Est. Duration (Days) <span class="text-danger">*</span></label>
+              <input type="number" class="form-control form-control-sm" id="estimated_duration" name="estimated_duration" min="1" value="{{ log.estimated_duration }}" required>
+            </div>
+
+            <!-- Notes -->
+            <div class="col-12">
+              <label for="notes" class="form-label small fw-semibold text-dark">Special Instructions & Diagnostic Notes</label>
+              <textarea class="form-control form-control-sm" id="notes" name="notes" rows="4">{{ log.notes }}</textarea>
+            </div>
+
+            <!-- Submit and Cancel Actions -->
+            <div class="col-12 border-top pt-3 mt-4 d-flex justify-content-between">
+              <a href="/maintenance/{{ log.id }}" class="btn btn-outline-secondary btn-sm" id="btn-cancel-edit">Discard Changes</a>
+              <button type="submit" class="btn btn-primary btn-sm" id="btn-submit-edit">Save Changes</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

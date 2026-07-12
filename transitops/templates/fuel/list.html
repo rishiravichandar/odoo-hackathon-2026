@@ -1,0 +1,531 @@
+{% extends 'base.html' %}
+
+{% block title %}Fuel Center - TransitOps{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h2 class="fw-bold text-dark m-0">Fuel Records & Management</h2>
+    <p class="text-secondary small m-0">Log refuelings, track fuel efficiency, and monitor fleet consumption metrics</p>
+  </div>
+  <button type="button" class="btn btn-primary d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#addFuelRecordModal" id="btn-add-fuel-record">
+    <i class="bi bi-fuel-pump"></i> Log Fuel Refill
+  </button>
+</div>
+
+<!-- Fuel KPI Dashboard -->
+<div class="row g-3 mb-4">
+  <!-- Total Records -->
+  <div class="col-6 col-sm-4 col-md-2">
+    <div class="card border-0 shadow-sm bg-white h-100">
+      <div class="card-body p-3 text-center">
+        <div class="p-2 rounded-3 bg-secondary bg-opacity-10 text-secondary mx-auto mb-2" style="width: fit-content;">
+          <i class="bi bi-file-earmark-text fs-5"></i>
+        </div>
+        <span class="text-muted small fw-semibold d-block">Total Logs</span>
+        <h4 class="fw-bold m-0 text-dark mt-1" id="kpi-total-records">{{ kpis.total_records }}</h4>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Total Cost -->
+  <div class="col-6 col-sm-4 col-md-2">
+    <div class="card border-0 shadow-sm bg-white h-100">
+      <div class="card-body p-3 text-center">
+        <div class="p-2 rounded-3 bg-success bg-opacity-10 text-success mx-auto mb-2" style="width: fit-content;">
+          <i class="bi bi-currency-rupee fs-5"></i>
+        </div>
+        <span class="text-muted small fw-semibold d-block">Total Spent</span>
+        <h4 class="fw-bold m-0 text-success mt-1" id="kpi-total-cost" style="font-size: 1.15rem;">₹{{ "{:,.2f}".format(kpis.total_cost) }}</h4>
+      </div>
+    </div>
+  </div>
+
+  <!-- Purchased This Month -->
+  <div class="col-6 col-sm-4 col-md-2">
+    <div class="card border-0 shadow-sm bg-white h-100">
+      <div class="card-body p-3 text-center">
+        <div class="p-2 rounded-3 bg-primary bg-opacity-10 text-primary mx-auto mb-2" style="width: fit-content;">
+          <i class="bi bi-calendar3 fs-5"></i>
+        </div>
+        <span class="text-muted small fw-semibold d-block">This Month</span>
+        <h4 class="fw-bold m-0 text-primary mt-1" id="kpi-monthly-spent" style="font-size: 1.1rem;">₹{{ "{:,.2f}".format(kpis.monthly_spent) }}</h4>
+      </div>
+    </div>
+  </div>
+
+  <!-- Avg Cost per Vehicle -->
+  <div class="col-6 col-sm-4 col-md-2">
+    <div class="card border-0 shadow-sm bg-white h-100">
+      <div class="card-body p-3 text-center">
+        <div class="p-2 rounded-3 bg-info bg-opacity-10 text-info mx-auto mb-2" style="width: fit-content;">
+          <i class="bi bi-truck fs-5"></i>
+        </div>
+        <span class="text-muted small fw-semibold d-block">Avg / Vehicle</span>
+        <h4 class="fw-bold m-0 text-dark mt-1" id="kpi-avg-cost-vehicle" style="font-size: 1.1rem;">₹{{ "{:,.0f}".format(kpis.avg_cost_per_vehicle) }}</h4>
+      </div>
+    </div>
+  </div>
+
+  <!-- Average Mileage -->
+  <div class="col-6 col-sm-4 col-md-2">
+    <div class="card border-0 shadow-sm bg-white h-100">
+      <div class="card-body p-3 text-center">
+        <div class="p-2 rounded-3 bg-warning bg-opacity-10 text-warning mx-auto mb-2" style="width: fit-content;">
+          <i class="bi bi-speedometer2 fs-5"></i>
+        </div>
+        <span class="text-muted small fw-semibold d-block">Avg Mileage</span>
+        <h4 class="fw-bold m-0 text-dark mt-1" id="kpi-avg-mileage">
+          {% if kpis.avg_mileage %}
+            {{ "{:.2f}".format(kpis.avg_mileage) }} <span class="text-xs" style="font-size: 0.7rem;">km/l</span>
+          {% else %}
+            --
+          {% endif %}
+        </h4>
+      </div>
+    </div>
+  </div>
+
+  <!-- Highest Fuel Consuming Vehicle -->
+  <div class="col-6 col-sm-4 col-md-2">
+    <div class="card border-0 shadow-sm bg-white h-100">
+      <div class="card-body p-3 text-center">
+        <div class="p-2 rounded-3 bg-danger bg-opacity-10 text-danger mx-auto mb-2" style="width: fit-content;">
+          <i class="bi bi-fire fs-5"></i>
+        </div>
+        <span class="text-muted small fw-semibold d-block">Max Consumer</span>
+        <h4 class="fw-bold m-0 text-danger mt-1" id="kpi-max-consumer" style="font-size: 0.95rem;" title="{{ kpis.highest_consuming_vehicle }}">
+          {{ kpis.highest_consuming_vehicle or 'None' }}
+        </h4>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Search & Filters Panel -->
+<div class="card border-0 shadow-sm rounded-3 mb-4">
+  <div class="card-body p-3">
+    <form method="GET" action="/fuel" class="row g-2 align-items-end" id="fuel-filter-form">
+      <!-- Search -->
+      <div class="col-md-3">
+        <label for="search_q" class="form-label text-secondary small fw-semibold mb-1">Search</label>
+        <div class="input-group input-group-sm">
+          <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+          <input type="text" class="form-control border-start-0" id="search_q" name="q" value="{{ q_search }}" placeholder="ID, Reg, Driver, Station...">
+        </div>
+      </div>
+
+      <!-- Vehicle -->
+      <div class="col-md-2">
+        <label for="filter_vehicle" class="form-label text-secondary small fw-semibold mb-1">Vehicle</label>
+        <select class="form-select form-select-sm" id="filter_vehicle" name="vehicle">
+          <option value="">All Vehicles</option>
+          {% for v in vehicles %}
+            <option value="{{ v.id }}" {% if f_vehicle == v.id|string %}selected{% endif %}>{{ v.registration_number }} ({{ v.name }})</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Driver -->
+      <div class="col-md-2">
+        <label for="filter_driver" class="form-label text-secondary small fw-semibold mb-1">Driver</label>
+        <select class="form-select form-select-sm" id="filter_driver" name="driver">
+          <option value="">All Drivers</option>
+          {% for d in drivers %}
+            <option value="{{ d.id }}" {% if f_driver == d.id|string %}selected{% endif %}>{{ d.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Fuel Type -->
+      <div class="col-md-1.5 col-md-2">
+        <label for="filter_fuel_type" class="form-label text-secondary small fw-semibold mb-1">Fuel Type</label>
+        <select class="form-select form-select-sm" id="filter_fuel_type" name="fuel_type">
+          <option value="">All Types</option>
+          <option value="Diesel" {% if f_fuel_type == 'Diesel' %}selected{% endif %}>Diesel</option>
+          <option value="Petrol" {% if f_fuel_type == 'Petrol' %}selected{% endif %}>Petrol</option>
+          <option value="CNG" {% if f_fuel_type == 'CNG' %}selected{% endif %}>CNG</option>
+          <option value="Electric Charging" {% if f_fuel_type == 'Electric Charging' %}selected{% endif %}>Electric Charging</option>
+        </select>
+      </div>
+
+      <!-- Payment Method -->
+      <div class="col-md-1.5 col-md-2">
+        <label for="filter_payment_method" class="form-label text-secondary small fw-semibold mb-1">Payment</label>
+        <select class="form-select form-select-sm" id="filter_payment_method" name="payment_method">
+          <option value="">All Payments</option>
+          <option value="Cash" {% if f_payment_method == 'Cash' %}selected{% endif %}>Cash</option>
+          <option value="UPI" {% if f_payment_method == 'UPI' %}selected{% endif %}>UPI</option>
+          <option value="Credit Card" {% if f_payment_method == 'Credit Card' %}selected{% endif %}>Credit Card</option>
+          <option value="Company Account" {% if f_payment_method == 'Company Account' %}selected{% endif %}>Company Account</option>
+        </select>
+      </div>
+
+      <!-- Sort Selection -->
+      <div class="col-md-2">
+        <label for="sort_by" class="form-label text-secondary small fw-semibold mb-1">Sort By</label>
+        <select class="form-select form-select-sm" id="sort_by" name="sort_by">
+          <option value="date" {% if sort_by == 'date' %}selected{% endif %}>Fuel Date</option>
+          <option value="cost" {% if sort_by == 'cost' %}selected{% endif %}>Total Cost</option>
+          <option value="quantity" {% if sort_by == 'quantity' %}selected{% endif %}>Quantity</option>
+          <option value="vehicle" {% if sort_by == 'vehicle' %}selected{% endif %}>Vehicle</option>
+          <option value="driver" {% if sort_by == 'driver' %}selected{% endif %}>Driver</option>
+        </select>
+      </div>
+
+      <!-- Filter button -->
+      <div class="col-md-1.5 col-md-2 d-flex gap-1">
+        <select class="form-select form-select-sm" id="sort_order" name="sort_order" style="width: 75px;">
+          <option value="DESC" {% if sort_order == 'DESC' %}selected{% endif %}>Desc</option>
+          <option value="ASC" {% if sort_order == 'ASC' %}selected{% endif %}>Asc</option>
+        </select>
+        <button type="submit" class="btn btn-primary btn-sm flex-grow-1" id="btn-apply-filters">Filter</button>
+        <a href="/fuel" class="btn btn-outline-secondary btn-sm" title="Clear Filters"><i class="bi bi-arrow-counterclockwise"></i></a>
+      </div>
+    </form>
+
+    <div class="d-flex align-items-center mt-2 pt-2 border-top border-light">
+      <span class="small text-secondary me-2 text-nowrap"><i class="bi bi-calendar-range me-1"></i>Date Range:</span>
+      <div class="d-flex align-items-center">
+        <input type="date" class="form-control form-control-sm me-2" name="date_from" value="{{ f_date_from }}" form="fuel-filter-form" style="width: 130px;">
+        <span class="small text-secondary me-2">to</span>
+        <input type="date" class="form-control form-control-sm" name="date_to" value="{{ f_date_to }}" form="fuel-filter-form" style="width: 130px;">
+        <button type="submit" class="btn btn-link btn-xs text-decoration-none ms-2" form="fuel-filter-form">Apply Date</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Main Table Card -->
+<div class="card border-0 shadow-sm rounded-3 mb-4">
+  <div class="card-header bg-white py-3 border-bottom border-light d-flex justify-content-between align-items-center">
+    <h5 class="card-title fw-bold m-0 text-dark">Fuel Transactions Ledger</h5>
+    <span class="badge bg-light text-dark border">{{ fuel_logs|length }} Transactions Loaded</span>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle m-0" id="table-fuel-logs">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-4">ID</th>
+            <th>Vehicle Asset</th>
+            <th>Driver</th>
+            <th>Fuel Type</th>
+            <th>Station</th>
+            <th class="text-end">Quantity (L)</th>
+            <th class="text-end">Price/L (₹)</th>
+            <th class="text-end">Total Cost (₹)</th>
+            <th class="text-end">Odometer</th>
+            <th class="text-center">Calculated Mileage</th>
+            <th>Date &amp; Time</th>
+            <th>Payment</th>
+            <th class="text-end pe-4">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for log in fuel_logs %}
+          <tr>
+            <td class="ps-4 font-mono fw-bold">
+              <a href="/fuel/{{ log.id }}" class="text-decoration-none text-primary" id="fuel-id-{{ log.id }}">FL-{{ log.id }}</a>
+            </td>
+            <td>
+              <div>
+                <strong class="text-dark">{{ log.vehicle_reg }}</strong>
+                <span class="text-secondary small d-block" style="font-size: 0.75rem;">{{ log.vehicle_name }}</span>
+              </div>
+            </td>
+            <td><span class="text-dark fw-medium">{{ log.driver_name or 'Unassigned' }}</span></td>
+            <td>
+              {% if log.fuel_type == 'Diesel' %}
+                <span class="badge bg-primary bg-opacity-10 text-primary">Diesel</span>
+              {% elif log.fuel_type == 'Petrol' %}
+                <span class="badge bg-info bg-opacity-10 text-info">Petrol</span>
+              {% elif log.fuel_type == 'CNG' %}
+                <span class="badge bg-success bg-opacity-10 text-success">CNG</span>
+              {% else %}
+                <span class="badge bg-warning bg-opacity-10 text-warning">Electric Charging</span>
+              {% endif %}
+            </td>
+            <td><span class="text-secondary small">{{ log.fuel_station }}</span></td>
+            <td class="text-end font-mono">{{ "{:.1f}".format(log.liters) }} L</td>
+            <td class="text-end font-mono">₹{{ "{:.2f}".format(log.price_per_liter) }}</td>
+            <td class="text-end font-mono fw-bold text-dark">₹{{ "{:,.2f}".format(log.cost) }}</td>
+            <td class="text-end font-mono text-secondary small">{{ "{:,.0f}".format(log.odometer) }} km</td>
+            <td class="text-center">
+              {% if log.mileage is not none %}
+                {% if (log.vehicle_type in ['Heavy Truck', 'Medium Truck'] and log.mileage < 4.0) or (log.vehicle_type not in ['Heavy Truck', 'Medium Truck'] and log.mileage < 10.0) %}
+                  <span class="badge bg-danger bg-opacity-10 text-danger border border-danger-subtle d-inline-flex align-items-center gap-1" title="Unusually low fuel efficiency detected for this vehicle category!">
+                    <i class="bi bi-exclamation-triangle"></i> {{ "{:.2f}".format(log.mileage) }} km/l
+                  </span>
+                {% else %}
+                  <span class="badge bg-success bg-opacity-10 text-success d-inline-flex align-items-center gap-1">
+                    <i class="bi bi-check-circle"></i> {{ "{:.2f}".format(log.mileage) }} km/l
+                  </span>
+                {% endif %}
+              {% else %}
+                <span class="text-muted small">— <span class="text-xs" style="font-size: 0.65rem; display: block;">First Log</span></span>
+              {% endif %}
+            </td>
+            <td class="small text-secondary">{{ log.date }}</td>
+            <td><span class="badge bg-light text-dark border">{{ log.payment_method }}</span></td>
+            <td class="text-end pe-4">
+              <div class="btn-group btn-group-sm">
+                <a href="/fuel/{{ log.id }}" class="btn btn-outline-secondary" title="View details" id="btn-view-{{ log.id }}"><i class="bi bi-eye"></i></a>
+                <a href="/fuel/edit/{{ log.id }}" class="btn btn-outline-primary" title="Edit record" id="btn-edit-{{ log.id }}"><i class="bi bi-pencil"></i></a>
+                <form action="/fuel/delete/{{ log.id }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this fuel record? This cannot be undone.');" style="display:inline;">
+                  <button type="submit" class="btn btn-outline-danger" title="Delete record" id="btn-delete-{{ log.id }}"><i class="bi bi-trash"></i></button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="13" class="text-center py-5 text-muted">
+              <i class="bi bi-fuel-pump fs-1 text-secondary opacity-50 d-block mb-2"></i>
+              No fuel logs found matching your search and filter criteria.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Vehicle Summary Reports in Fuel Module -->
+<div class="card border-0 shadow-sm rounded-3">
+  <div class="card-header bg-white py-3 border-bottom border-light">
+    <h5 class="card-title fw-bold m-0 text-dark d-flex align-items-center gap-2">
+      <i class="bi bi-bar-chart-line text-primary"></i> Vehicle Fuel Consumption &amp; Mileage Analytics Summaries
+    </h5>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle m-0" id="table-fuel-summaries">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-4">Vehicle Registration</th>
+            <th>Model Name</th>
+            <th>Type</th>
+            <th class="text-end">Total Consumed (L)</th>
+            <th class="text-end">Total Fuel Spent</th>
+            <th class="text-center">Average Mileage</th>
+            <th class="text-end">Avg Cost / KM</th>
+            <th>Preferred Station</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for stat in reports_stats %}
+          <tr>
+            <td class="ps-4 font-mono fw-bold">{{ stat.registration_number }}</td>
+            <td><span class="text-dark fw-medium">{{ stat.name }}</span></td>
+            <td><span class="text-secondary small">{{ stat.type }}</span></td>
+            <td class="text-end font-mono">{{ "{:,.1f}".format(stat.total_liters) }} L</td>
+            <td class="text-end font-mono fw-bold text-success">₹{{ "{:,.2f}".format(stat.total_cost) }}</td>
+            <td class="text-center font-mono">
+              {% if stat.avg_mileage %}
+                <span class="fw-semibold text-dark">{{ "{:.2f}".format(stat.avg_mileage) }} km/l</span>
+              {% else %}
+                <span class="text-muted small">Not enough data</span>
+              {% endif %}
+            </td>
+            <td class="text-end font-mono text-secondary">
+              {% if stat.avg_cost_per_km %}
+                ₹{{ "{:.2f}".format(stat.avg_cost_per_km) }} / km
+              {% else %}
+                <span class="text-muted small">—</span>
+              {% endif %}
+            </td>
+            <td>
+              <span class="badge bg-light text-dark border"><i class="bi bi-geo-alt-fill text-danger me-1"></i>{{ stat.preferred_station or 'N/A' }}</span>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="8" class="text-center py-4 text-muted small">No vehicles have fuel logs logged yet.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Log Fuel Refill -->
+<div class="modal fade" id="addFuelRecordModal" tabindex="-1" aria-labelledby="addFuelRecordModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-dark text-white py-3">
+        <h5 class="modal-title fw-bold" id="addFuelRecordModalLabel"><i class="bi bi-fuel-pump-fill me-2 text-info"></i>Log New Fuel Refill Record</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form action="/fuel/add" method="POST" id="add-fuel-form">
+        <div class="modal-body p-4">
+          <div class="row g-3">
+            
+            <!-- Vehicle Selection -->
+            <div class="col-md-6">
+              <label for="modal_vehicle_id" class="form-label small fw-semibold text-dark">Select Vehicle <span class="text-danger">*</span></label>
+              <select class="form-select form-select-sm" id="modal_vehicle_id" name="vehicle_id" required>
+                <option value="" disabled selected>-- Choose Active Vehicle --</option>
+                {% for v in active_vehicles %}
+                  <option value="{{ v.id }}" data-odometer="{{ v.odometer }}" data-assigned-driver-id="{{ v.assigned_driver_id or '' }}">
+                    {{ v.registration_number }} &mdash; {{ v.name }} [Odo: {{ "{:,.0f}".format(v.odometer) }} km]
+                  </option>
+                {% endfor %}
+              </select>
+              <div class="form-text" style="font-size: 0.75rem;">Only active (non-retired) vehicles are listed.</div>
+            </div>
+
+            <!-- Driver Selection -->
+            <div class="col-md-6">
+              <label for="modal_driver_id" class="form-label small fw-semibold text-dark">Driver <span class="text-danger">*</span></label>
+              <select class="form-select form-select-sm" id="modal_driver_id" name="driver_id" required>
+                <option value="" disabled selected>-- Choose Driver --</option>
+                {% for d in drivers %}
+                  <option value="{{ d.id }}">{{ d.name }} ({{ d.employee_id }})</option>
+                {% endfor %}
+              </select>
+              <div class="form-text" style="font-size: 0.75rem;">Will automatically pre-select driver assigned to vehicle.</div>
+            </div>
+
+            <!-- Fuel Type -->
+            <div class="col-md-6">
+              <label for="modal_fuel_type" class="form-label small fw-semibold text-dark">Fuel Type <span class="text-danger">*</span></label>
+              <select class="form-select form-select-sm" id="modal_fuel_type" name="fuel_type" required>
+                <option value="Diesel" selected>Diesel</option>
+                <option value="Petrol">Petrol</option>
+                <option value="CNG">CNG</option>
+                <option value="Electric Charging">Electric Charging</option>
+              </select>
+            </div>
+
+            <!-- Fuel Station -->
+            <div class="col-md-6">
+              <label for="modal_fuel_station" class="form-label small fw-semibold text-dark">Fuel Station / Vendor Name <span class="text-danger">*</span></label>
+              <input type="text" class="form-control form-control-sm" id="modal_fuel_station" name="fuel_station" list="station-suggestions" placeholder="Enter station name" required>
+              <datalist id="station-suggestions">
+                <option value="Indian Oil">
+                <option value="Bharat Petroleum">
+                <option value="HP Petrol Pump">
+                <option value="Shell India">
+                <option value="Nayara Energy">
+              </datalist>
+            </div>
+
+            <!-- Fuel Quantity (Litres) -->
+            <div class="col-md-4">
+              <label for="modal_liters" class="form-label small fw-semibold text-dark">Fuel Quantity (Litres) <span class="text-danger">*</span></label>
+              <input type="number" class="form-control form-control-sm" id="modal_liters" name="liters" min="0.01" step="0.01" placeholder="0.00" required>
+            </div>
+
+            <!-- Price per Litre -->
+            <div class="col-md-4">
+              <label for="modal_price_per_liter" class="form-label small fw-semibold text-dark">Price per Litre (₹) <span class="text-danger">*</span></label>
+              <input type="number" class="form-control form-control-sm" id="modal_price_per_liter" name="price_per_liter" min="0.01" step="0.01" placeholder="0.00" required>
+            </div>
+
+            <!-- Total Cost (Auto-calculated) -->
+            <div class="col-md-4">
+              <label for="modal_total_cost" class="form-label small fw-semibold text-dark">Total Cost (₹)</label>
+              <div class="input-group input-group-sm">
+                <span class="input-group-text">₹</span>
+                <input type="text" class="form-control form-control-sm bg-light fw-bold text-dark" id="modal_total_cost" placeholder="0.00" readonly>
+              </div>
+              <div class="form-text" style="font-size: 0.72rem; color: #1abc9c;"><i class="bi bi-calculator"></i> Auto-calculated as Qty &times; Price</div>
+            </div>
+
+            <!-- Current Odometer -->
+            <div class="col-md-6">
+              <label for="modal_odometer" class="form-label small fw-semibold text-dark">Current Odometer (km) <span class="text-danger">*</span></label>
+              <input type="number" class="form-control form-control-sm" id="modal_odometer" name="odometer" min="0" placeholder="Enter current odometer" required>
+              <div class="form-text text-muted" id="odometer_helper_text" style="font-size: 0.75rem;">Select a vehicle to view its current odometer.</div>
+            </div>
+
+            <!-- Fuel Date & Time -->
+            <div class="col-md-6">
+              <label for="modal_date" class="form-label small fw-semibold text-dark">Fuel Date &amp; Time <span class="text-danger">*</span></label>
+              <input type="datetime-local" class="form-control form-control-sm" id="modal_date" name="date" required>
+            </div>
+
+            <!-- Payment Method -->
+            <div class="col-md-6">
+              <label for="modal_payment_method" class="form-label small fw-semibold text-dark">Payment Method <span class="text-danger">*</span></label>
+              <select class="form-select form-select-sm" id="modal_payment_method" name="payment_method" required>
+                <option value="Cash">Cash</option>
+                <option value="UPI" selected>UPI</option>
+                <option value="Credit Card">Credit Card</option>
+                <option value="Company Account">Company Account</option>
+              </select>
+            </div>
+
+            <!-- Remarks -->
+            <div class="col-md-12">
+              <label for="modal_remarks" class="form-label small fw-semibold text-dark">Remarks / Special Notes</label>
+              <textarea class="form-control form-control-sm" id="modal_remarks" name="remarks" rows="2" placeholder="Describe special notes like full tank, additives, engine smooth..."></textarea>
+            </div>
+
+          </div>
+        </div>
+        <div class="modal-footer bg-light py-2">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal" id="btn-modal-close">Close</button>
+          <button type="submit" class="btn btn-primary btn-sm" id="btn-modal-submit">Save Fuel Record</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Automatic pricing total calculation
+  const litInput = document.getElementById('modal_liters');
+  const priceInput = document.getElementById('modal_price_per_liter');
+  const totalInput = document.getElementById('modal_total_cost');
+
+  function calculateTotal() {
+    const qty = parseFloat(litInput.value) || 0;
+    const price = parseFloat(priceInput.value) || 0;
+    totalInput.value = (qty * price).toFixed(2);
+  }
+
+  litInput.addEventListener('input', calculateTotal);
+  priceInput.addEventListener('input', calculateTotal);
+
+  // Dynamic assigned driver and odometer validation helper on vehicle selection
+  const vehicleSelect = document.getElementById('modal_vehicle_id');
+  const driverSelect = document.getElementById('modal_driver_id');
+  const odometerInput = document.getElementById('modal_odometer');
+  const odoHelper = document.getElementById('odometer_helper_text');
+
+  vehicleSelect.addEventListener('change', function() {
+    const selectedOption = vehicleSelect.options[vehicleSelect.selectedIndex];
+    
+    // Odometer setting and minimum validation
+    const currentOdo = parseFloat(selectedOption.getAttribute('data-odometer')) || 0;
+    odometerInput.value = currentOdo;
+    odometerInput.min = currentOdo;
+    odoHelper.innerHTML = `Vehicle's latest odometer is <strong>${currentOdo.toLocaleString()} km</strong>. New odometer reading cannot be less than this.`;
+
+    // Pre-select assigned driver if available
+    const assignedDriverId = selectedOption.getAttribute('data-assigned-driver-id');
+    if (assignedDriverId) {
+      driverSelect.value = assignedDriverId;
+    } else {
+      driverSelect.value = "";
+    }
+  });
+
+  // Default to today's date and time for refuel log
+  document.addEventListener("DOMContentLoaded", function() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    
+    const formattedDateTime = `${year}-${month}-${day}T${hours}:${minutes}`;
+    document.getElementById('modal_date').value = formattedDateTime;
+  });
+</script>
+{% endblock %}
