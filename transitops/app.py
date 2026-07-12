@@ -1805,8 +1805,31 @@ def trips_complete(id):
     if not actual_return:
         actual_return = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
 
+    final_odometer_str = request.form.get('final_odometer', '').strip()
+    fuel_consumed_str = request.form.get('fuel_consumed', '').strip()
+    price_per_liter_str = request.form.get('price_per_liter', '95.0').strip()
+    fuel_station = request.form.get('fuel_station', 'Terminal Fuel Station').strip()
+    payment_method = request.form.get('payment_method', 'Company Account').strip()
+
+    if not final_odometer_str or not fuel_consumed_str:
+        flash('Final odometer and fuel consumed are required.', 'error')
+        return redirect(url_for('trips_details', id=id))
+
+    try:
+        final_odometer = float(final_odometer_str)
+        fuel_consumed = float(fuel_consumed_str)
+        price_per_liter = float(price_per_liter_str)
+    except ValueError:
+        flash('Odometer, fuel consumed, and price per liter must be valid numbers.', 'error')
+        return redirect(url_for('trips_details', id=id))
+
     conn = get_db_connection()
-    trip = conn.execute("SELECT * FROM trips WHERE id = ?", (id,)).fetchone()
+    trip = conn.execute("""
+        SELECT t.*, v.odometer AS vehicle_odometer, v.type AS vehicle_type
+        FROM trips t
+        JOIN vehicles v ON t.vehicle_id = v.id
+        WHERE t.id = ?
+    """, (id,)).fetchone()
     if not trip:
         conn.close()
         flash('Trip not found.', 'error')
@@ -1822,27 +1845,90 @@ def trips_complete(id):
 
     if trip['status'] not in ('In Progress', 'Dispatched'):
         conn.close()
-        flash('Only Dispatched trips can be completed.', 'error')
+        flash('Only active trips can be completed.', 'error')
         return redirect(url_for('trips_details', id=id))
 
+    if final_odometer < trip['vehicle_odometer']:
+        conn.close()
+        flash(f"Final odometer ({final_odometer}) cannot be less than the start odometer ({trip['vehicle_odometer']}).", 'error')
+        return redirect(url_for('trips_details', id=id))
+
+    if fuel_consumed <= 0:
+        conn.close()
+        flash('Fuel consumed must be greater than 0.', 'error')
+        return redirect(url_for('trips_details', id=id))
+
+    if price_per_liter < 0:
+        conn.close()
+        flash('Price per liter cannot be negative.', 'error')
+        return redirect(url_for('trips_details', id=id))
+
+    actual_distance = final_odometer - trip['vehicle_odometer']
     cursor = conn.cursor()
+    
+    # 1. Update Trip: Mark status as 'Completed' and record fuel_consumed and actual return date
     cursor.execute("""
         UPDATE trips 
-        SET status = 'Completed', actual_return = ? 
+        SET status = 'Completed', 
+            actual_return = ?, 
+            fuel_consumed = ?,
+            planned_distance = ?
         WHERE id = ?
-    """, (actual_return, id))
+    """, (actual_return, fuel_consumed, actual_distance if actual_distance > 0 else trip['planned_distance'], id))
     
+    # 2. Mark Driver as Available
     cursor.execute("UPDATE drivers SET status = 'Available' WHERE id = ?", (trip['driver_id'],))
+    
+    # 3. Mark Vehicle as Available and update odometer to final_odometer
     cursor.execute("""
         UPDATE vehicles 
-        SET status = 'Available', odometer = odometer + ? 
+        SET status = 'Available', odometer = ? 
         WHERE id = ?
-    """, (trip['planned_distance'], trip['vehicle_id']))
+    """, (final_odometer, trip['vehicle_id']))
+
+    # 4. Create associated fuel log entry for reports & operational cost tracking
+    fuel_cost = fuel_consumed * price_per_liter
+    fuel_type = 'Diesel' if 'truck' in trip['vehicle_type'].lower() else 'Petrol'
+    
+    existing_fuel = conn.execute("SELECT id FROM fuel_logs WHERE trip_id = ?", (id,)).fetchone()
+    if not existing_fuel:
+        cursor.execute("""
+            INSERT INTO fuel_logs (vehicle_id, driver_id, fuel_type, fuel_station, liters, price_per_liter, cost, odometer, date, payment_method, remarks, trip_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            trip['vehicle_id'], 
+            trip['driver_id'], 
+            fuel_type, 
+            fuel_station, 
+            fuel_consumed, 
+            price_per_liter, 
+            fuel_cost, 
+            final_odometer, 
+            actual_return, 
+            payment_method, 
+            f"Logged automatically upon completing trip TRIP-{id}", 
+            id
+        ))
+        
+        # 5. Insert corresponding expense
+        cursor.execute("""
+            INSERT INTO expenses (vehicle_id, type, amount, date, description, driver_id, trip_id, payment_method, status)
+            VALUES (?, 'Fuel', ?, ?, ?, ?, ?, ?, 'Paid')
+        """, (
+            trip['vehicle_id'],
+            'Fuel',
+            fuel_cost,
+            actual_return[:10],
+            f"Trip refuel: {fuel_consumed}L for TRIP-{id}",
+            trip['driver_id'],
+            id,
+            payment_method
+        ))
 
     conn.commit()
     conn.close()
 
-    flash(f"Trip TRIP-{id} completed successfully! Vehicle odometer updated.", 'success')
+    flash(f"Trip TRIP-{id} completed successfully! Vehicle odometer, fuel log, and driver status updated.", 'success')
     return redirect(url_for('trips_details', id=id))
 
 @app.route('/trips/cancel/<int:id>', methods=['POST'])

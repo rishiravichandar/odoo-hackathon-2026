@@ -201,6 +201,39 @@
               <input type="datetime-local" class="form-control bg-secondary text-white border-secondary" id="form-actual-return" name="actual_return">
               <small class="text-gray-400" style="font-size: 0.72rem;">Leave blank to record current date and time automatically</small>
             </div>
+
+            <div class="mb-3">
+              <label for="final_odometer" class="form-label text-light small fw-medium mb-1">Final Odometer Reading (km) <span class="text-danger">*</span></label>
+              <input type="number" step="any" min="{{ trip.vehicle_odometer }}" class="form-control bg-secondary text-white border-secondary" id="form-final-odometer" name="final_odometer" value="{{ trip.vehicle_odometer + trip.planned_distance }}" required>
+              <small class="text-gray-400" style="font-size: 0.72rem;">Current reading is <strong>{{ trip.vehicle_odometer }} km</strong>. Expected distance is <strong>{{ trip.planned_distance }} km</strong>.</small>
+            </div>
+
+            <div class="mb-3">
+              <label for="fuel_consumed" class="form-label text-light small fw-medium mb-1">Trip Fuel Consumed (Liters) <span class="text-danger">*</span></label>
+              <input type="number" step="any" min="0.1" class="form-control bg-secondary text-white border-secondary" id="form-fuel-consumed" name="fuel_consumed" value="{{ ((trip.planned_distance / 8.0) | round(1)) if trip.planned_distance else 15.0 }}" placeholder="e.g. 45" required>
+              <small class="text-gray-400" style="font-size: 0.72rem;">Recommended value based on typical heavy vehicle average.</small>
+            </div>
+
+            <div class="row g-2 mb-3">
+              <div class="col-6">
+                <label for="price_per_liter" class="form-label text-light small fw-medium mb-1">Price per Liter (INR)</label>
+                <input type="number" step="any" min="0" class="form-control bg-secondary text-white border-secondary" id="form-price-per-liter" name="price_per_liter" value="95.0" required>
+              </div>
+              <div class="col-6">
+                <label for="payment_method" class="form-label text-light small fw-medium mb-1">Payment Method</label>
+                <select class="form-select bg-secondary text-white border-secondary text-sm" id="form-payment-method" name="payment_method">
+                  <option value="Company Account" selected>Company Account</option>
+                  <option value="UPI">UPI</option>
+                  <option value="Credit Card">Credit Card</option>
+                  <option value="Cash">Cash</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label for="fuel_station" class="form-label text-light small fw-medium mb-1">Refuel Station</label>
+              <input type="text" class="form-control bg-secondary text-white border-secondary" id="form-fuel-station" name="fuel_station" value="Terminal Fuel Station" required>
+            </div>
             
             <div class="d-grid gap-2">
               <button type="submit" class="btn btn-success d-flex align-items-center justify-content-center gap-2 py-2 fw-semibold" id="btn-complete-trip">
