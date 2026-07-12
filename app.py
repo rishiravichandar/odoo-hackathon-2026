@@ -1913,7 +1913,7 @@ def trips_complete(id):
         # 5. Insert corresponding expense
         cursor.execute("""
             INSERT INTO expenses (vehicle_id, type, amount, date, description, driver_id, trip_id, payment_method, status)
-            VALUES (?, 'Fuel', ?, ?, ?, ?, ?, ?, 'Paid')
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             trip['vehicle_id'],
             'Fuel',
@@ -1922,7 +1922,8 @@ def trips_complete(id):
             f"Trip refuel: {fuel_consumed}L for TRIP-{id}",
             trip['driver_id'],
             id,
-            payment_method
+            payment_method,
+            'Paid'
         ))
 
     conn.commit()
